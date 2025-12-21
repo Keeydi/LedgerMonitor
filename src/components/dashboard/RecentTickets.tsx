@@ -1,4 +1,5 @@
 import { FileText, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Violation } from '@/types/parking';
@@ -9,6 +10,8 @@ interface RecentTicketsProps {
 }
 
 export function RecentTickets({ violations }: RecentTicketsProps) {
+  const navigate = useNavigate();
+
   const getStatusConfig = (status: Violation['status']) => {
     switch (status) {
       case 'warning':
@@ -33,14 +36,14 @@ export function RecentTickets({ violations }: RecentTicketsProps) {
           <FileText className="h-5 w-5 text-muted-foreground" />
           <h3 className="font-medium text-foreground">Recent Activity</h3>
         </div>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
           View All
           <ExternalLink className="h-4 w-4 ml-1" />
         </Button>
       </div>
 
       <div className="divide-y divide-border">
-        {violations.map((violation) => {
+        {violations.slice(0, 5).map((violation) => {
           const statusConfig = getStatusConfig(violation.status);
           return (
             <div key={violation.id} className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors">
