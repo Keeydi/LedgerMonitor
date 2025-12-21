@@ -21,14 +21,14 @@ export default function Warnings() {
         subtitle="Vehicles with pending violations"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {activeWarnings.length > 0 ? (
           <>
             <div className="flex items-center gap-2 text-warning">
-              <AlertTriangle className="h-5 w-5" />
-              <span className="font-medium">{activeWarnings.length} active warnings</span>
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />
+              <span className="font-medium text-sm sm:text-base">{activeWarnings.length} active warnings</span>
             </div>
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {activeWarnings.map((violation) => (
                 <WarningTimer
                   key={violation.id}
@@ -40,10 +40,10 @@ export default function Warnings() {
             </div>
           </>
         ) : (
-          <div className="glass-card rounded-xl p-12 text-center">
-            <CheckCircle className="h-16 w-16 text-success mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">All Clear</h3>
-            <p className="text-muted-foreground">No active parking warnings at this time</p>
+          <div className="glass-card rounded-xl p-8 sm:p-12 text-center">
+            <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-success mx-auto mb-4" />
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">All Clear</h3>
+            <p className="text-muted-foreground text-sm sm:text-base">No active parking warnings at this time</p>
           </div>
         )}
       </div>

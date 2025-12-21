@@ -53,16 +53,16 @@ export default function Tickets() {
         subtitle="All parking violation records"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Filters */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Status:</span>
+              <span className="text-sm text-muted-foreground hidden sm:inline">Status:</span>
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40 bg-secondary">
+              <SelectTrigger className="w-full sm:w-40 bg-secondary">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -76,57 +76,84 @@ export default function Tickets() {
             </Select>
           </div>
 
-          <Button variant="outline">
+          <Button variant="outline" className="w-full sm:w-auto">
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
         </div>
 
-        {/* Table */}
-        <div className="glass-card rounded-xl overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-border hover:bg-transparent">
-                <TableHead className="text-muted-foreground">Ticket ID</TableHead>
-                <TableHead className="text-muted-foreground">Plate Number</TableHead>
-                <TableHead className="text-muted-foreground">Location</TableHead>
-                <TableHead className="text-muted-foreground">Detected</TableHead>
-                <TableHead className="text-muted-foreground">Issued</TableHead>
-                <TableHead className="text-muted-foreground">Status</TableHead>
-                <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredViolations.map((violation) => {
-                const statusConfig = getStatusConfig(violation.status);
-                return (
-                  <TableRow key={violation.id} className="border-border">
-                    <TableCell className="font-mono text-sm">{violation.ticketId}</TableCell>
-                    <TableCell className="font-mono font-medium">{violation.plateNumber}</TableCell>
-                    <TableCell>{violation.cameraLocationId}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(violation.timeDetected).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {violation.timeIssued 
-                        ? new Date(violation.timeIssued).toLocaleString() 
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusConfig.variant}>
-                        {statusConfig.label}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        {/* Mobile Cards */}
+        <div className="block sm:hidden space-y-3">
+          {filteredViolations.map((violation) => {
+            const statusConfig = getStatusConfig(violation.status);
+            return (
+              <div key={violation.id} className="glass-card rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-xs text-muted-foreground">{violation.ticketId}</span>
+                  <Badge variant={statusConfig.variant}>
+                    {statusConfig.label}
+                  </Badge>
+                </div>
+                <div className="font-mono font-medium text-lg">{violation.plateNumber}</div>
+                <div className="text-sm text-muted-foreground">{violation.cameraLocationId}</div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Detected: {new Date(violation.timeDetected).toLocaleString()}</span>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table */}
+        <div className="glass-card rounded-xl overflow-hidden hidden sm:block">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="text-muted-foreground">Ticket ID</TableHead>
+                  <TableHead className="text-muted-foreground">Plate Number</TableHead>
+                  <TableHead className="text-muted-foreground">Location</TableHead>
+                  <TableHead className="text-muted-foreground">Detected</TableHead>
+                  <TableHead className="text-muted-foreground">Issued</TableHead>
+                  <TableHead className="text-muted-foreground">Status</TableHead>
+                  <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredViolations.map((violation) => {
+                  const statusConfig = getStatusConfig(violation.status);
+                  return (
+                    <TableRow key={violation.id} className="border-border">
+                      <TableCell className="font-mono text-sm">{violation.ticketId}</TableCell>
+                      <TableCell className="font-mono font-medium">{violation.plateNumber}</TableCell>
+                      <TableCell>{violation.cameraLocationId}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(violation.timeDetected).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {violation.timeIssued 
+                          ? new Date(violation.timeIssued).toLocaleString() 
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={statusConfig.variant}>
+                          {statusConfig.label}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="icon">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
     </div>

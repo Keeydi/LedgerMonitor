@@ -26,9 +26,9 @@ export default function Dashboard() {
         subtitle="Monitor parking violations in real-time"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <StatCard
             title="Registered Vehicles"
             value={mockVehicles.length}
@@ -56,13 +56,13 @@ export default function Dashboard() {
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Active Warnings */}
           <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
+            <h2 className="text-base sm:text-lg font-semibold text-foreground flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-warning" />
               Active Warnings
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-sm">
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs sm:text-sm">
                 {activeWarnings.length}
               </span>
             </h2>
@@ -78,16 +78,16 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <div className="glass-card rounded-xl p-8 text-center">
-                <CheckCircle className="h-12 w-12 text-success mx-auto mb-3" />
-                <p className="text-muted-foreground">No active warnings</p>
+              <div className="glass-card rounded-xl p-6 sm:p-8 text-center">
+                <CheckCircle className="h-10 w-10 sm:h-12 sm:w-12 text-success mx-auto mb-3" />
+                <p className="text-muted-foreground text-sm sm:text-base">No active warnings</p>
               </div>
             )}
           </div>
 
           {/* Camera Feed */}
           <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-foreground">Camera Feed</h2>
+            <h2 className="text-base sm:text-lg font-semibold text-foreground">Camera Feed</h2>
             <CameraFeed camera={mockCameras[0]} />
           </div>
         </div>
