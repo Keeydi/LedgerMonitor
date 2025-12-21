@@ -21,12 +21,14 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export default function Vehicles() {
   const [vehicles, setVehicles] = useState<Vehicle[]>(mockVehicles);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newVehicle, setNewVehicle] = useState({
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [formData, setFormData] = useState({
     plateNumber: '',
     ownerName: '',
     contactNumber: '',
@@ -38,21 +40,60 @@ export default function Vehicles() {
       v.ownerName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddVehicle = () => {
-    if (!newVehicle.plateNumber || !newVehicle.ownerName || !newVehicle.contactNumber) return;
-    
-    const vehicle: Vehicle = {
-      id: Date.now().toString(),
-      ...newVehicle,
-      registeredAt: new Date(),
-    };
-    setVehicles([...vehicles, vehicle]);
-    setNewVehicle({ plateNumber: '', ownerName: '', contactNumber: '' });
+  const resetForm = () => {
+    setFormData({ plateNumber: '', ownerName: '', contactNumber: '' });
+    setEditingVehicle(null);
+  };
+
+  const handleOpenDialog = (vehicle?: Vehicle) => {
+    if (vehicle) {
+      setEditingVehicle(vehicle);
+      setFormData({
+        plateNumber: vehicle.plateNumber,
+        ownerName: vehicle.ownerName,
+        contactNumber: vehicle.contactNumber,
+      });
+    } else {
+      resetForm();
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
     setIsDialogOpen(false);
+    resetForm();
+  };
+
+  const handleSaveVehicle = () => {
+    if (!formData.plateNumber || !formData.ownerName || !formData.contactNumber) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (editingVehicle) {
+      // Update existing vehicle
+      setVehicles(vehicles.map(v => 
+        v.id === editingVehicle.id 
+          ? { ...v, ...formData }
+          : v
+      ));
+      toast.success('Vehicle updated successfully');
+    } else {
+      // Add new vehicle
+      const vehicle: Vehicle = {
+        id: Date.now().toString(),
+        ...formData,
+        registeredAt: new Date(),
+      };
+      setVehicles([...vehicles, vehicle]);
+      toast.success('Vehicle registered successfully');
+    }
+    handleCloseDialog();
   };
 
   const handleDeleteVehicle = (id: string) => {
     setVehicles(vehicles.filter((v) => v.id !== id));
+    toast.success('Vehicle deleted successfully');
   };
 
   return (
@@ -75,7 +116,7 @@ export default function Vehicles() {
             />
           </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => open ? handleOpenDialog() : handleCloseDialog()}>
             <DialogTrigger asChild>
               <Button className="w-full sm:w-auto">
                 <Plus className="h-4 w-4 mr-2" />
@@ -84,7 +125,7 @@ export default function Vehicles() {
             </DialogTrigger>
             <DialogContent className="bg-card border-border mx-4 sm:mx-auto max-w-[calc(100vw-2rem)] sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>Register New Vehicle</DialogTitle>
+                <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Register New Vehicle'}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -92,8 +133,8 @@ export default function Vehicles() {
                   <Input
                     id="plateNumber"
                     placeholder="ABC 1234"
-                    value={newVehicle.plateNumber}
-                    onChange={(e) => setNewVehicle({ ...newVehicle, plateNumber: e.target.value })}
+                    value={formData.plateNumber}
+                    onChange={(e) => setFormData({ ...formData, plateNumber: e.target.value })}
                     className="bg-secondary"
                   />
                 </div>
@@ -102,8 +143,8 @@ export default function Vehicles() {
                   <Input
                     id="ownerName"
                     placeholder="Juan dela Cruz"
-                    value={newVehicle.ownerName}
-                    onChange={(e) => setNewVehicle({ ...newVehicle, ownerName: e.target.value })}
+                    value={formData.ownerName}
+                    onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
                     className="bg-secondary"
                   />
                 </div>
@@ -112,27 +153,27 @@ export default function Vehicles() {
                   <Input
                     id="contactNumber"
                     placeholder="+639171234567"
-                    value={newVehicle.contactNumber}
-                    onChange={(e) => setNewVehicle({ ...newVehicle, contactNumber: e.target.value })}
+                    value={formData.contactNumber}
+                    onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
                     className="bg-secondary"
                   />
                 </div>
-                <Button onClick={handleAddVehicle} className="w-full">
-                  Register Vehicle
+                <Button onClick={handleSaveVehicle} className="w-full">
+                  {editingVehicle ? 'Save Changes' : 'Register Vehicle'}
                 </Button>
               </div>
             </DialogContent>
           </Dialog>
         </div>
 
-        {/* Mobile Cards / Desktop Table */}
+        {/* Mobile Cards */}
         <div className="block sm:hidden space-y-3">
           {filteredVehicles.map((vehicle) => (
             <div key={vehicle.id} className="glass-card rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <span className="font-mono font-medium text-lg">{vehicle.plateNumber}</span>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog(vehicle)}>
                     <Edit className="h-4 w-4" />
                   </Button>
                   <Button 
@@ -186,7 +227,7 @@ export default function Vehicles() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(vehicle)}>
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button 
