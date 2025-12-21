@@ -9,18 +9,18 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
-        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-4 sm:px-6">
+      <div className="pl-12 lg:pl-0">
+        <h1 className="text-lg sm:text-xl font-semibold text-foreground">{title}</h1>
+        {subtitle && <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">{subtitle}</p>}
       </div>
       
-      <div className="flex items-center gap-4">
-        <div className="relative">
+      <div className="flex items-center gap-2 sm:gap-4">
+        <div className="relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input 
             placeholder="Search..." 
-            className="w-64 pl-9 bg-secondary border-border"
+            className="w-48 md:w-64 pl-9 bg-secondary border-border"
           />
         </div>
         <Button variant="ghost" size="icon" className="relative">
