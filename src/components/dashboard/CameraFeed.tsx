@@ -21,10 +21,10 @@ export function CameraFeed({ camera, onRefresh }: CameraFeedProps) {
   const isOnline = camera.status === 'online';
 
   const CameraContent = ({ fullscreen = false }: { fullscreen?: boolean }) => (
-    <div className={cn("relative bg-secondary flex items-center justify-center", fullscreen ? "aspect-video w-full" : "aspect-video")}>
+    <div className={cn("relative bg-muted flex items-center justify-center", fullscreen ? "aspect-video w-full" : "aspect-video")}>
       {isOnline ? (
         <>
-          <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-foreground/10 to-transparent" />
           <div className="relative flex flex-col items-center gap-2 text-muted-foreground">
             <CameraIcon className={cn("opacity-30", fullscreen ? "h-20 w-20" : "h-12 w-12")} />
             <span className={cn(fullscreen ? "text-lg" : "text-sm")}>Live Feed</span>
@@ -34,9 +34,9 @@ export function CameraFeed({ camera, onRefresh }: CameraFeedProps) {
           </div>
           {/* Simulated detection overlay */}
           <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 bg-background/80 backdrop-blur-sm rounded-lg px-3 py-2">
+            <div className="flex items-center gap-2 bg-foreground/80 backdrop-blur-sm rounded-lg px-3 py-2">
               <span className="status-indicator status-warning" />
-              <span className={cn("font-mono text-foreground", fullscreen ? "text-sm" : "text-xs")}>1 vehicle detected</span>
+              <span className={cn("font-mono text-background", fullscreen ? "text-sm" : "text-xs")}>1 vehicle detected</span>
             </div>
           </div>
         </>
