@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Plus, Search, Edit, Trash2, Phone } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Phone, Car } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { mockVehicles } from '@/data/mockData';
 import { Vehicle } from '@/types/parking';
 import {
   Table,
@@ -21,10 +20,10 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 export default function Vehicles() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(mockVehicles);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -66,34 +65,45 @@ export default function Vehicles() {
 
   const handleSaveVehicle = () => {
     if (!formData.plateNumber || !formData.ownerName || !formData.contactNumber) {
-      toast.error('Please fill in all fields');
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
       return;
     }
 
     if (editingVehicle) {
-      // Update existing vehicle
       setVehicles(vehicles.map(v => 
         v.id === editingVehicle.id 
           ? { ...v, ...formData }
           : v
       ));
-      toast.success('Vehicle updated successfully');
+      toast({
+        title: "Vehicle Updated",
+        description: "Vehicle details updated successfully",
+      });
     } else {
-      // Add new vehicle
       const vehicle: Vehicle = {
         id: Date.now().toString(),
         ...formData,
         registeredAt: new Date(),
       };
       setVehicles([...vehicles, vehicle]);
-      toast.success('Vehicle registered successfully');
+      toast({
+        title: "Vehicle Registered",
+        description: "New vehicle registered successfully",
+      });
     }
     handleCloseDialog();
   };
 
   const handleDeleteVehicle = (id: string) => {
     setVehicles(vehicles.filter((v) => v.id !== id));
-    toast.success('Vehicle deleted successfully');
+    toast({
+      title: "Vehicle Deleted",
+      description: "Vehicle removed from registry",
+    });
   };
 
   return (
@@ -166,86 +176,102 @@ export default function Vehicles() {
           </Dialog>
         </div>
 
-        {/* Mobile Cards */}
-        <div className="block sm:hidden space-y-3">
-          {filteredVehicles.map((vehicle) => (
-            <div key={vehicle.id} className="glass-card rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-medium text-lg">{vehicle.plateNumber}</span>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog(vehicle)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={() => handleDeleteVehicle(vehicle.id)}
-                    className="text-destructive hover:text-destructive h-8 w-8"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+        {vehicles.length > 0 ? (
+          <>
+            {/* Mobile Cards */}
+            <div className="block sm:hidden space-y-3">
+              {filteredVehicles.map((vehicle) => (
+                <div key={vehicle.id} className="glass-card rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-medium text-lg">{vehicle.plateNumber}</span>
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenDialog(vehicle)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleDeleteVehicle(vehicle.id)}
+                        className="text-destructive hover:text-destructive h-8 w-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="text-sm text-foreground">{vehicle.ownerName}</div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Phone className="h-4 w-4" />
+                    {vehicle.contactNumber}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Registered: {new Date(vehicle.registeredAt).toLocaleDateString()}
+                  </div>
                 </div>
-              </div>
-              <div className="text-sm text-foreground">{vehicle.ownerName}</div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Phone className="h-4 w-4" />
-                {vehicle.contactNumber}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Registered: {new Date(vehicle.registeredAt).toLocaleDateString()}
+              ))}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="glass-card rounded-xl overflow-hidden hidden sm:block">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-border hover:bg-transparent">
+                      <TableHead className="text-muted-foreground">Plate Number</TableHead>
+                      <TableHead className="text-muted-foreground">Owner</TableHead>
+                      <TableHead className="text-muted-foreground">Contact</TableHead>
+                      <TableHead className="text-muted-foreground">Registered</TableHead>
+                      <TableHead className="text-muted-foreground text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredVehicles.map((vehicle) => (
+                      <TableRow key={vehicle.id} className="border-border">
+                        <TableCell className="font-mono font-medium">{vehicle.plateNumber}</TableCell>
+                        <TableCell>{vehicle.ownerName}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Phone className="h-4 w-4" />
+                            {vehicle.contactNumber}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {new Date(vehicle.registeredAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(vehicle)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => handleDeleteVehicle(vehicle.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Desktop Table */}
-        <div className="glass-card rounded-xl overflow-hidden hidden sm:block">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="text-muted-foreground">Plate Number</TableHead>
-                  <TableHead className="text-muted-foreground">Owner</TableHead>
-                  <TableHead className="text-muted-foreground">Contact</TableHead>
-                  <TableHead className="text-muted-foreground">Registered</TableHead>
-                  <TableHead className="text-muted-foreground text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredVehicles.map((vehicle) => (
-                  <TableRow key={vehicle.id} className="border-border">
-                    <TableCell className="font-mono font-medium">{vehicle.plateNumber}</TableCell>
-                    <TableCell>{vehicle.ownerName}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Phone className="h-4 w-4" />
-                        {vehicle.contactNumber}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(vehicle.registeredAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(vehicle)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleDeleteVehicle(vehicle.id)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          </>
+        ) : (
+          <div className="glass-card rounded-xl p-8 sm:p-12 text-center">
+            <Car className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-foreground mb-2">No Vehicles Registered</h3>
+            <p className="text-muted-foreground mb-6">
+              Add your first vehicle to the registry
+            </p>
+            <Button onClick={() => handleOpenDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Your First Vehicle
+            </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

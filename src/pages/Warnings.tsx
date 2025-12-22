@@ -1,10 +1,12 @@
+import { useState } from 'react';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { WarningTimer } from '@/components/dashboard/WarningTimer';
-import { mockViolations } from '@/data/mockData';
+import { Violation } from '@/types/parking';
 
 export default function Warnings() {
-  const activeWarnings = mockViolations.filter(v => v.status === 'warning');
+  const [violations] = useState<Violation[]>([]);
+  const activeWarnings = violations.filter(v => v.status === 'warning');
 
   const handleCancelWarning = (id: string) => {
     console.log('Cancel warning:', id);
