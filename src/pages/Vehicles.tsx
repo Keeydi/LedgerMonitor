@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Phone, Car } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
+import { usePageTracking } from '@/hooks/usePageTracking';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Vehicle } from '@/types/parking';
+import { Vehicle, Host } from '@/types/parking';
 import {
   Table,
   TableBody,
@@ -15,15 +16,24 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { vehiclesAPI, hostsAPI } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Vehicles() {
+  usePageTracking();
+  const { user } = useAuth();
+  const isEncoder = user?.role === 'encoder';
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -31,7 +41,48 @@ export default function Vehicles() {
     plateNumber: '',
     ownerName: '',
     contactNumber: '',
+    hostId: '',
+    rented: '',
+    purposeOfVisit: '',
   });
+
+  // Load vehicles from API
+  useEffect(() => {
+    loadVehicles();
+  }, [searchTerm]);
+
+  // Load hosts when dialog opens
+  useEffect(() => {
+    if (isDialogOpen) {
+      loadHosts();
+    }
+  }, [isDialogOpen]);
+
+  const loadHosts = async () => {
+    try {
+      const data = await hostsAPI.getAll();
+      setHosts(data);
+    } catch (error) {
+      console.error('Error loading hosts:', error);
+    }
+  };
+
+  const loadVehicles = async () => {
+    try {
+      setIsLoading(true);
+      const data = await vehiclesAPI.getAll(searchTerm || undefined);
+      setVehicles(data);
+    } catch (error) {
+      console.error('Error loading vehicles:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load vehicles. Make sure the backend server is running.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredVehicles = vehicles.filter(
     (v) =>
@@ -40,17 +91,37 @@ export default function Vehicles() {
   );
 
   const resetForm = () => {
-    setFormData({ plateNumber: '', ownerName: '', contactNumber: '' });
+    setFormData({ 
+      plateNumber: '', 
+      ownerName: '', 
+      contactNumber: '',
+      hostId: '',
+      rented: '',
+      purposeOfVisit: '',
+    });
     setEditingVehicle(null);
   };
 
   const handleOpenDialog = (vehicle?: Vehicle) => {
+    // Encoders can only add vehicles, not edit
+    if (vehicle && isEncoder) {
+      toast({
+        title: "Permission Denied",
+        description: "Encoders can only add new vehicles, not edit existing ones.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (vehicle) {
       setEditingVehicle(vehicle);
       setFormData({
         plateNumber: vehicle.plateNumber,
         ownerName: vehicle.ownerName,
         contactNumber: vehicle.contactNumber,
+        hostId: vehicle.hostId || '',
+        rented: vehicle.rented || '',
+        purposeOfVisit: vehicle.purposeOfVisit || '',
       });
     } else {
       resetForm();
@@ -63,47 +134,114 @@ export default function Vehicles() {
     resetForm();
   };
 
-  const handleSaveVehicle = () => {
-    if (!formData.plateNumber || !formData.ownerName || !formData.contactNumber) {
+  const handleSaveVehicle = async () => {
+    if (!formData.plateNumber || !formData.ownerName || !formData.purposeOfVisit) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all fields",
+        description: "Please fill in plate number, owner name, and purpose of visit",
         variant: "destructive",
       });
       return;
     }
 
-    if (editingVehicle) {
-      setVehicles(vehicles.map(v => 
-        v.id === editingVehicle.id 
-          ? { ...v, ...formData }
-          : v
-      ));
+    // If host is selected and not rented, contact number will be fetched from host
+    // If rented, contact number is required
+    if (formData.rented && !formData.contactNumber) {
       toast({
-        title: "Vehicle Updated",
-        description: "Vehicle details updated successfully",
+        title: "Validation Error",
+        description: "Contact number is required when vehicle is rented",
+        variant: "destructive",
       });
-    } else {
-      const vehicle: Vehicle = {
-        id: Date.now().toString(),
-        ...formData,
-        registeredAt: new Date(),
-      };
-      setVehicles([...vehicles, vehicle]);
+      return;
+    }
+
+    try {
+      if (editingVehicle) {
+        await vehiclesAPI.update(editingVehicle.id, {
+          ...formData,
+          hostId: formData.hostId || null,
+          rented: formData.rented || null,
+        });
+        toast({
+          title: "Vehicle Updated",
+          description: "Vehicle details updated successfully",
+        });
+      } else {
+        const vehicleId = `VEH-${Date.now()}`;
+        await vehiclesAPI.create({
+          id: vehicleId,
+          ...formData,
+          hostId: formData.hostId || null,
+          rented: formData.rented || null,
+          dataSource: 'barangay', // All vehicles are provided by Barangay
+        });
+        toast({
+          title: "Vehicle Registered",
+          description: "New vehicle registered successfully",
+        });
+      }
+      handleCloseDialog();
+      loadVehicles();
+    } catch (error: any) {
       toast({
-        title: "Vehicle Registered",
-        description: "New vehicle registered successfully",
+        title: "Error",
+        description: error.message || "Failed to save vehicle",
+        variant: "destructive",
       });
     }
-    handleCloseDialog();
   };
 
-  const handleDeleteVehicle = (id: string) => {
-    setVehicles(vehicles.filter((v) => v.id !== id));
-    toast({
-      title: "Vehicle Deleted",
-      description: "Vehicle removed from registry",
-    });
+  const handleHostChange = (hostId: string) => {
+    if (!hostId) {
+      // Clear host selection - keep contact number as is
+      setFormData({
+        ...formData,
+        hostId: '',
+      });
+      return;
+    }
+    // Find the selected host and auto-fill contact number
+    const selectedHost = hosts.find(h => h.id === hostId);
+    if (selectedHost) {
+      setFormData({
+        ...formData,
+        hostId: hostId,
+        contactNumber: selectedHost.contactNumber, // Automatically fill contact number from host
+        rented: '', // Clear rented field when host is selected
+      });
+    } else {
+      setFormData({
+        ...formData,
+        hostId: hostId,
+      });
+    }
+  };
+
+  const handleDeleteVehicle = async (id: string) => {
+    // Encoders cannot delete vehicles
+    if (isEncoder) {
+      toast({
+        title: "Permission Denied",
+        description: "Encoders can only add new vehicles, not delete existing ones.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      await vehiclesAPI.delete(id);
+      toast({
+        title: "Vehicle Deleted",
+        description: "Vehicle removed from registry",
+      });
+      loadVehicles();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete vehicle",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -136,10 +274,15 @@ export default function Vehicles() {
             <DialogContent className="bg-card border-border mx-4 sm:mx-auto max-w-[calc(100vw-2rem)] sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Register New Vehicle'}</DialogTitle>
+                <DialogDescription>
+                  {editingVehicle 
+                    ? 'Update the vehicle information below.' 
+                    : 'Enter the vehicle details to register it in the system.'}
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-4">
+              <div className="space-y-4 py-4 max-h-[80vh] overflow-y-auto">
                 <div className="space-y-2">
-                  <Label htmlFor="plateNumber">Plate Number</Label>
+                  <Label htmlFor="plateNumber">Plate Number *</Label>
                   <Input
                     id="plateNumber"
                     placeholder="ABC 1234"
@@ -149,7 +292,7 @@ export default function Vehicles() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ownerName">Owner Name</Label>
+                  <Label htmlFor="ownerName">Owner Name *</Label>
                   <Input
                     id="ownerName"
                     placeholder="Juan dela Cruz"
@@ -159,14 +302,85 @@ export default function Vehicles() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="contactNumber">Contact Number</Label>
+                  <Label htmlFor="hostId">Host (Optional)</Label>
+                  <Select 
+                    value={formData.hostId || undefined} 
+                    onValueChange={handleHostChange}
+                  >
+                    <SelectTrigger className="bg-secondary">
+                      <SelectValue placeholder="Select a host" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {hosts.map((host) => (
+                        <SelectItem key={host.id} value={host.id}>
+                          {host.name} - {host.contactNumber}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.hostId && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => handleHostChange('')}
+                    >
+                      Clear selection
+                    </Button>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    If selected, contact number will be automatically filled from host
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rented">Rented (Optional)</Label>
+                  <Input
+                    id="rented"
+                    placeholder="Court, etc."
+                    value={formData.rented}
+                    onChange={(e) => {
+                      const rentedValue = e.target.value;
+                      setFormData({ 
+                        ...formData, 
+                        rented: rentedValue,
+                        hostId: rentedValue ? '' : formData.hostId, // Clear host if rented is filled
+                      });
+                    }}
+                    className="bg-secondary"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    If vehicle is rented, enter the location (e.g., Court). Contact number will be the renter's.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contactNumber">Contact Number *</Label>
                   <Input
                     id="contactNumber"
                     placeholder="+639171234567"
                     value={formData.contactNumber}
                     onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
                     className="bg-secondary"
+                    disabled={!!formData.hostId && !formData.rented}
                   />
+                  {formData.hostId && !formData.rented && (
+                    <p className="text-xs text-muted-foreground">
+                      Contact number is automatically set from selected host
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="purposeOfVisit">Purpose of Visit *</Label>
+                  <Input
+                    id="purposeOfVisit"
+                    placeholder="e.g., Delivery, Appointment with Kap, Visit resident"
+                    value={formData.purposeOfVisit}
+                    onChange={(e) => setFormData({ ...formData, purposeOfVisit: e.target.value })}
+                    className="bg-secondary"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Required for all vehicles entering the barangay
+                  </p>
                 </div>
                 <Button onClick={handleSaveVehicle} className="w-full">
                   {editingVehicle ? 'Save Changes' : 'Register Vehicle'}
@@ -238,19 +452,21 @@ export default function Vehicles() {
                           {new Date(vehicle.registeredAt).toLocaleDateString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(vehicle)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon"
-                              onClick={() => handleDeleteVehicle(vehicle.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {!isEncoder && (
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(vehicle)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => handleDeleteVehicle(vehicle.id)}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -1,92 +1,140 @@
-import { useState } from 'react';
-import { Camera as CameraIcon, RefreshCw, Maximize2, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState, useCallback, memo, useRef } from 'react';
+import { Camera as CameraIcon } from 'lucide-react';
 import { Camera } from '@/types/parking';
 import { cn } from '@/lib/utils';
+import { capturesAPI } from '@/lib/api';
+import { useCameraStream } from '@/hooks/useCameraStream';
+import { useCaptureTimer } from '@/hooks/useCaptureTimer';
+import { useDetections } from '@/hooks/useDetections';
+import { VideoPlayer, VideoPlayerHandle } from './VideoPlayer';
+import { CameraHeader } from './CameraHeader';
+import { CameraFooter } from './CameraFooter';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 interface CameraFeedProps {
   camera: Camera;
   onRefresh?: () => void;
+  onDelete?: (id: string) => void;
+  canDelete?: boolean;
 }
 
-export function CameraFeed({ camera, onRefresh }: CameraFeedProps) {
+export const CameraFeed = memo(function CameraFeed({
+  camera,
+  onRefresh,
+  onDelete,
+  canDelete = true,
+}: CameraFeedProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const isOnline = camera.status === 'online';
+  const videoPlayerRef = useRef<VideoPlayerHandle>(null);
+  const fullscreenVideoPlayerRef = useRef<VideoPlayerHandle>(null);
 
-  const CameraContent = ({ fullscreen = false }: { fullscreen?: boolean }) => (
-    <div className={cn("relative bg-muted flex items-center justify-center", fullscreen ? "aspect-video w-full" : "aspect-video")}>
-      {isOnline ? (
-        <>
-          <div className="absolute inset-0 bg-gradient-to-t from-foreground/10 to-transparent" />
-          <div className="relative flex flex-col items-center gap-2 text-muted-foreground">
-            <CameraIcon className={cn("opacity-30", fullscreen ? "h-20 w-20" : "h-12 w-12")} />
-            <span className={cn(fullscreen ? "text-lg" : "text-sm")}>Live Feed</span>
-            <span className={cn("font-mono", fullscreen ? "text-base" : "text-xs")}>
-              Last capture: {new Date(camera.lastCapture).toLocaleTimeString()}
-            </span>
-          </div>
-          {/* Simulated detection overlay */}
-          <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between">
-            <div className="flex items-center gap-2 bg-foreground/80 backdrop-blur-sm rounded-lg px-3 py-2">
-              <span className="status-indicator status-warning" />
-              <span className={cn("font-mono text-background", fullscreen ? "text-sm" : "text-xs")}>1 vehicle detected</span>
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <CameraIcon className={cn("opacity-30", fullscreen ? "h-20 w-20" : "h-12 w-12")} />
-          <span className={cn(fullscreen ? "text-lg" : "text-sm")}>Camera Offline</span>
-        </div>
-      )}
-    </div>
-  );
+  // Custom hooks for complex logic
+  const { stream, refresh: refreshStream } = useCameraStream({
+    deviceId: camera.deviceId,
+    isOnline,
+  });
+
+  const { detections, vehicleCount } = useDetections({
+    cameraId: camera.id,
+    isOnline,
+  });
+
+  const handleCapture = useCallback(async () => {
+    try {
+      // Try to capture frame from video element
+      const videoPlayer = isFullscreen ? fullscreenVideoPlayerRef.current : videoPlayerRef.current;
+      let imageData: string | null = null;
+
+      if (videoPlayer) {
+        imageData = await videoPlayer.captureFrame();
+      }
+
+      // Send capture request with image data
+      await capturesAPI.trigger(camera.id, imageData || undefined);
+      
+      // Wait a moment for backend to process, then refresh
+      setTimeout(() => {
+        if (onRefresh) {
+          onRefresh();
+        }
+      }, 2000);
+    } catch (error) {
+      console.error('Error capturing image:', error);
+      // Still try to trigger capture without image
+      await capturesAPI.trigger(camera.id);
+    }
+  }, [camera.id, onRefresh, isFullscreen]);
+
+  const { captureStatus, nextCaptureTime, resetTimer } = useCaptureTimer({
+    cameraId: camera.id,
+    isOnline,
+    lastCapture: camera.lastCapture,
+    onCapture: handleCapture,
+  });
+
+  const handleRefresh = useCallback(() => {
+    refreshStream();
+    resetTimer();
+    if (onRefresh) {
+      onRefresh();
+    }
+  }, [refreshStream, resetTimer, onRefresh]);
+
+  const handleDelete = useCallback(() => {
+    if (onDelete) {
+      onDelete(camera.id);
+    }
+    setShowDeleteDialog(false);
+  }, [camera.id, onDelete]);
 
   return (
     <>
       <div className="glass-card rounded-xl overflow-hidden animate-slide-up">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <CameraIcon className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <h3 className="font-medium text-foreground">{camera.name}</h3>
-              <p className="text-xs text-muted-foreground">{camera.locationId}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={isOnline ? "success" : "destructive"}>
-              <span className={cn(
-                "status-indicator mr-1.5",
-                isOnline ? "status-active" : "status-violation"
-              )} />
-              {isOnline ? 'Online' : 'Offline'}
-            </Badge>
-          </div>
+        <CameraHeader
+          camera={camera}
+          isOnline={isOnline}
+          onDelete={canDelete && onDelete ? () => setShowDeleteDialog(true) : undefined}
+        />
+
+        <div className={cn('relative bg-muted flex items-center justify-center overflow-hidden aspect-video')}>
+          <VideoPlayer
+            ref={videoPlayerRef}
+            stream={stream}
+            isOnline={isOnline}
+            camera={camera}
+            detections={detections}
+            vehicleCount={vehicleCount}
+          />
         </div>
 
-        <CameraContent />
-
-        {/* Controls */}
-        <div className="flex items-center justify-between p-3 border-t border-border">
-          <span className="text-xs text-muted-foreground">
-            Next capture in 15:00
-          </span>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={onRefresh}>
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setIsFullscreen(true)}>
-              <Maximize2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <CameraFooter
+          isOnline={isOnline}
+          captureStatus={captureStatus}
+          nextCaptureTime={nextCaptureTime}
+          onRefresh={handleRefresh}
+          onFullscreen={() => setIsFullscreen(true)}
+        />
       </div>
 
       {/* Fullscreen Dialog */}
@@ -98,25 +146,39 @@ export function CameraFeed({ camera, onRefresh }: CameraFeedProps) {
                 <CameraIcon className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <DialogTitle>{camera.name}</DialogTitle>
-                  <p className="text-xs text-muted-foreground">{camera.locationId}</p>
+                  <DialogDescription className="text-xs text-muted-foreground">
+                    {camera.locationId} - {isOnline ? 'Online' : 'Offline'}
+                  </DialogDescription>
                 </div>
               </div>
-              <Badge variant={isOnline ? "success" : "destructive"}>
-                <span className={cn(
-                  "status-indicator mr-1.5",
-                  isOnline ? "status-active" : "status-violation"
-                )} />
+              <Badge variant={isOnline ? 'success' : 'destructive'}>
+                <span
+                  className={cn(
+                    'status-indicator mr-1.5',
+                    isOnline ? 'status-active' : 'status-violation'
+                  )}
+                />
                 {isOnline ? 'Online' : 'Offline'}
               </Badge>
             </div>
           </DialogHeader>
-          <CameraContent fullscreen />
+          <div className={cn('relative bg-muted flex items-center justify-center overflow-hidden aspect-video w-full')}>
+            <VideoPlayer
+              ref={fullscreenVideoPlayerRef}
+              stream={stream}
+              isOnline={isOnline}
+              camera={camera}
+              detections={detections}
+              vehicleCount={vehicleCount}
+              fullscreen
+            />
+          </div>
           <div className="flex items-center justify-between p-4 border-t border-border">
             <span className="text-sm text-muted-foreground">
               Last capture: {new Date(camera.lastCapture).toLocaleString()}
             </span>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onRefresh}>
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
@@ -124,6 +186,27 @@ export function CameraFeed({ camera, onRefresh }: CameraFeedProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Camera</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{camera.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
-}
+});

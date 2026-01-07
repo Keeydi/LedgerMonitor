@@ -1,19 +1,90 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
+import { usePageTracking } from '@/hooks/usePageTracking';
 import { WarningTimer } from '@/components/dashboard/WarningTimer';
 import { Violation } from '@/types/parking';
+import { violationsAPI } from '@/lib/api';
+import { toast } from '@/hooks/use-toast';
 
 export default function Warnings() {
-  const [violations] = useState<Violation[]>([]);
+  usePageTracking();
+  const [violations, setViolations] = useState<Violation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const activeWarnings = violations.filter(v => v.status === 'warning');
 
-  const handleCancelWarning = (id: string) => {
-    console.log('Cancel warning:', id);
+  useEffect(() => {
+    loadViolations();
+    // Refresh every 30 seconds to get new warnings
+    const interval = setInterval(loadViolations, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadViolations = async () => {
+    try {
+      setIsLoading(true);
+      const data = await violationsAPI.getAll();
+      // Convert date strings to Date objects
+      const processedViolations = data.map((v: any) => ({
+        ...v,
+        timeDetected: new Date(v.timeDetected),
+        timeIssued: v.timeIssued ? new Date(v.timeIssued) : undefined,
+        warningExpiresAt: v.warningExpiresAt ? new Date(v.warningExpiresAt) : undefined,
+      }));
+      setViolations(processedViolations);
+    } catch (error) {
+      console.error('Error loading violations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load warnings. Make sure the backend server is running.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleIssueTicket = (id: string) => {
-    console.log('Issue ticket:', id);
+  const handleCancelWarning = async (id: string) => {
+    try {
+      await violationsAPI.update(id, { status: 'cleared' });
+      toast({
+        title: "Warning Cleared",
+        description: "The warning has been cleared successfully",
+      });
+      await loadViolations();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to clear warning",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleIssueTicket = async (id: string) => {
+    try {
+      const violation = violations.find(v => v.id === id);
+      if (!violation) return;
+
+      const ticketId = `TICKET-${Date.now()}`;
+      await violationsAPI.update(id, {
+        status: 'issued',
+        timeIssued: new Date().toISOString(),
+        ticketId: ticketId,
+      });
+      
+      toast({
+        title: "Ticket Issued",
+        description: `Ticket ${ticketId} has been issued for plate ${violation.plateNumber}`,
+      });
+      await loadViolations();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to issue ticket",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -24,7 +95,11 @@ export default function Warnings() {
       />
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-        {activeWarnings.length > 0 ? (
+        {isLoading ? (
+          <div className="glass-card rounded-xl p-8 sm:p-12 text-center">
+            <p className="text-muted-foreground">Loading warnings...</p>
+          </div>
+        ) : activeWarnings.length > 0 ? (
           <>
             <div className="flex items-center gap-2 text-warning">
               <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />

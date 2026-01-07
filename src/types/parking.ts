@@ -4,6 +4,18 @@ export interface Vehicle {
   ownerName: string;
   contactNumber: string;
   registeredAt: Date;
+  dataSource?: string;
+  hostId?: string;
+  rented?: string;
+  purposeOfVisit?: string;
+}
+
+export interface Host {
+  id: string;
+  name: string;
+  contactNumber: string;
+  address?: string;
+  createdAt: Date;
 }
 
 export interface Camera {
@@ -12,6 +24,9 @@ export interface Camera {
   name: string;
   status: 'online' | 'offline';
   lastCapture: Date;
+  deviceId?: string;
+  isFixed?: boolean;
+  illegalParkingZone?: boolean;
 }
 
 export interface Detection {
@@ -25,12 +40,12 @@ export interface Detection {
 
 export interface Violation {
   id: string;
-  ticketId: string;
+  ticketId?: string;
   plateNumber: string;
   cameraLocationId: string;
   timeDetected: Date;
   timeIssued?: Date;
-  status: 'warning' | 'pending' | 'issued' | 'cancelled' | 'cleared';
+  status: 'warning' | 'pending' | 'issued' | 'cancelled' | 'cleared' | 'resolved';
   warningExpiresAt?: Date;
 }
 

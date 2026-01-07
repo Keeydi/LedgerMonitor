@@ -1,73 +1,124 @@
-# Welcome to your Lovable project
+# ViolationLedger
 
-## Project info
+A parking monitoring system with camera surveillance, vehicle tracking, and violation management.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+### Frontend
+- React + TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui components
+- React Router
 
-There are several ways of editing your application.
+### Backend
+- Node.js + Express
+- SQLite database
+- REST API
+- Python image analysis service (Hugging Face ML models)
 
-**Use Lovable**
+## Setup Instructions
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 1. Install Frontend Dependencies
+```bash
+npm install
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+### 2. Install Backend Dependencies
+```bash
+npm run server:install
+```
 
-**Use your preferred IDE**
+### 3. Install Python Dependencies (for Image Analysis)
+```bash
+cd server
+pip install -r requirements.txt
+huggingface-cli login
+```
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+**Note**: You need a Hugging Face account and token to access the dataset. Get your token at https://huggingface.co/settings/tokens
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 4. Start Development Servers
 
-Follow these steps:
+**Option A: Run both servers together**
+```bash
+npm run dev:all
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+**Option B: Run separately**
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+Terminal 1 - Backend:
+```bash
+npm run dev:server
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+Terminal 2 - Frontend:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### 5. Access the Application
+- Frontend: http://localhost:8080
+- Backend API: http://localhost:3001/api
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## API Endpoints
 
-**Use GitHub Codespaces**
+### Cameras
+- `GET /api/cameras` - Get all cameras
+- `GET /api/cameras/:id` - Get camera by ID
+- `POST /api/cameras` - Create new camera
+- `PUT /api/cameras/:id` - Update camera
+- `DELETE /api/cameras/:id` - Delete camera
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Vehicles
+- `GET /api/vehicles` - Get all vehicles (optional `?search=query`)
+- `GET /api/vehicles/:id` - Get vehicle by ID
+- `POST /api/vehicles` - Create new vehicle
+- `PUT /api/vehicles/:id` - Update vehicle
+- `DELETE /api/vehicles/:id` - Delete vehicle
 
-## What technologies are used for this project?
+### Violations
+- `GET /api/violations` - Get all violations (optional `?status=warning`)
+- `GET /api/violations/:id` - Get violation by ID
+- `POST /api/violations` - Create new violation
+- `PUT /api/violations/:id` - Update violation
+- `DELETE /api/violations/:id` - Delete violation
 
-This project is built with:
+### Captures
+- `POST /api/captures` - Trigger image capture for all online cameras
+- `POST /api/captures/:cameraId` - Trigger image capture for a specific camera
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Database
 
-## How can I deploy this project?
+The SQLite database (`server/parking.db`) is automatically created on first server start with the following tables:
+- `vehicles` - Registered vehicles
+- `cameras` - Surveillance cameras
+- `violations` - Parking violations
+- `detections` - Vehicle detections from cameras
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## Image Analysis Service
 
-## Can I connect a custom domain to my Lovable project?
+The system includes an automated image analysis service that:
+- Captures images from online cameras every 5 minutes
+- Analyzes images for illegally parked vehicles using Hugging Face ML models
+- Recognizes license plates (when visible)
+- Automatically creates violations/warnings in the system
 
-Yes, you can!
+See `server/README_PYTHON_SETUP.md` for detailed setup instructions.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## Environment Variables
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Create a `.env` file in the root directory:
+```
+VITE_API_URL=http://localhost:3001/api
+```
+
+## Production Build
+
+```bash
+# Build frontend
+npm run build
+
+# Start backend
+npm run server:start
+```
