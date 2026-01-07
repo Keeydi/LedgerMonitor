@@ -481,6 +481,34 @@ async function seedUsers() {
         console.log('   Role: barangay_user');
       }
     }
+    
+    // Seed Encoder user
+    const encoderEmail = 'encoder@encoder.com';
+    const encoderPassword = 'encoder123';
+    const encoderPasswordHash = crypto.createHash('sha256').update(encoderPassword).digest('hex');
+    const encoderUserId = 'USER-ENCODER-001';
+    
+    const encoderUser = dbWrapper.prepare('SELECT * FROM users WHERE email = ?').get(encoderEmail);
+    
+    if (encoderUser) {
+      // Encoder user exists, ensure role is correct
+      if (encoderUser.role !== 'encoder') {
+        dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('encoder', encoderEmail);
+        console.log('✅ Updated existing Encoder user role');
+      } else {
+        console.log('ℹ️  Encoder user already exists');
+      }
+    } else {
+      // Create new Encoder user
+      dbWrapper.prepare(`
+        INSERT INTO users (id, email, password, name, role, createdAt)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(encoderUserId, encoderEmail, encoderPasswordHash, 'Encoder User', 'encoder', now);
+      
+      console.log('✅ Seeded Encoder user: encoder@encoder.com');
+      console.log('   Password: encoder123');
+      console.log('   Role: encoder');
+    }
   } catch (error) {
     console.error('❌ Error seeding users:', error?.message || String(error));
     console.error('   Stack:', error?.stack);
