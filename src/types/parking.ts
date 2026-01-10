@@ -47,6 +47,11 @@ export interface Violation {
   timeIssued?: Date;
   status: 'warning' | 'pending' | 'issued' | 'cancelled' | 'cleared' | 'resolved';
   warningExpiresAt?: Date;
+  imageUrl?: string;
+  imageBase64?: string;
+  message?: string;
+  detectionId?: string;
+  vehicleType?: string;
 }
 
 export type ViolationStatus = Violation['status'];

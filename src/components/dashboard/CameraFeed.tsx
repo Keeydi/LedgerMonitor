@@ -70,19 +70,39 @@ export const CameraFeed = memo(function CameraFeed({
         imageData = await videoPlayer.captureFrame();
       }
 
-      // Send capture request with image data
-      await capturesAPI.trigger(camera.id, imageData || undefined);
+      // Send capture request with image data and wait for AI processing to complete
+      console.log('📸 Sending capture request and waiting for AI processing...');
+      const response = await capturesAPI.trigger(camera.id, imageData || undefined);
       
-      // Wait a moment for backend to process, then refresh
-      setTimeout(() => {
+      // Wait for AI processing to complete before showing results
+      if (response && response.aiProcessingComplete !== false) {
+        console.log('✅ AI processing complete, refreshing results...');
+        // Small delay to ensure database writes are complete
+        await new Promise(resolve => setTimeout(resolve, 500));
         if (onRefresh) {
           onRefresh();
         }
-      }, 2000);
+      } else {
+        // If AI processing not complete, wait a bit longer
+        console.log('⏳ Waiting for AI processing to complete...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        if (onRefresh) {
+          onRefresh();
+        }
+      }
     } catch (error) {
       console.error('Error capturing image:', error);
       // Still try to trigger capture without image
-      await capturesAPI.trigger(camera.id);
+      try {
+        await capturesAPI.trigger(camera.id);
+        // Wait for processing even on error
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        if (onRefresh) {
+          onRefresh();
+        }
+      } catch (retryError) {
+        console.error('Error on retry capture:', retryError);
+      }
     }
   }, [camera.id, onRefresh, isFullscreen]);
 

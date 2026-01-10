@@ -1,12 +1,11 @@
 import express from 'express';
 import db from '../database.js';
-import { sendSMS, formatParkingWarningSMS, shouldSendSMS } from '../sms_service.js';
+import { sendViolationSMS } from '../utils/smsService.js';
 
 const router = express.Router();
 
 /**
  * Automatically create a violation from a detection
- * This function handles the complete flow: violation creation + SMS sending
  * @param {string} plateNumber - Vehicle plate number
  * @param {string} cameraLocationId - Camera location ID
  * @param {string} detectionId - Detection ID (optional, for tracking)
@@ -14,53 +13,15 @@ const router = express.Router();
  */
 export async function createViolationFromDetection(plateNumber, cameraLocationId, detectionId = null) {
   try {
-    // Skip if plate is not visible
-    if (!plateNumber || plateNumber.toUpperCase() === 'NONE') {
+    // Skip if plate is not visible or is blurry (BLUR means visible but unreadable)
+    if (!plateNumber || plateNumber.toUpperCase() === 'NONE' || plateNumber.toUpperCase() === 'BLUR') {
       return null;
     }
 
-    // Get vehicle info first to check contact number and prevent duplicate SMS
+    // Get vehicle info to check if registered
     const vehicle = db.prepare('SELECT * FROM vehicles WHERE plateNumber = ?').get(plateNumber);
     if (!vehicle) {
       console.log(`ℹ️  Vehicle ${plateNumber} not registered - skipping automatic violation creation`);
-      return null;
-    }
-
-    // Check if SMS was already sent for this plate recently (within last 2 hours)
-    // This prevents duplicate SMS sends even if violation doesn't exist yet
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const recentSmsLog = db.prepare(`
-      SELECT * FROM sms_logs 
-      WHERE plateNumber = ? 
-      AND contactNumber = ?
-      AND status IN ('sent', 'success')
-      AND sentAt > ?
-      ORDER BY sentAt DESC
-      LIMIT 1
-    `).get(plateNumber, vehicle.contactNumber, twoHoursAgo);
-    
-    if (recentSmsLog) {
-      console.log(`ℹ️  SMS already sent recently for ${plateNumber} (within last 2 hours) - skipping duplicate send`);
-      // Find or return existing violation
-      const existingViolation = db.prepare(`
-        SELECT * FROM violations 
-        WHERE plateNumber = ? 
-        AND cameraLocationId = ?
-        AND status IN ('warning', 'pending')
-        ORDER BY timeDetected DESC
-        LIMIT 1
-      `).get(plateNumber, cameraLocationId);
-      
-      if (existingViolation) {
-        return {
-          ...existingViolation,
-          timeDetected: new Date(existingViolation.timeDetected),
-          timeIssued: existingViolation.timeIssued ? new Date(existingViolation.timeIssued) : null,
-          warningExpiresAt: existingViolation.warningExpiresAt ? new Date(existingViolation.warningExpiresAt) : null,
-          smsSent: true,
-          smsLogId: recentSmsLog.id
-        };
-      }
       return null;
     }
 
@@ -74,32 +35,13 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
 
     let violationId;
     let isExistingViolation = false;
+    let smsSent = false;
+    let smsLogId = null;
     
     if (existingViolation) {
       console.log(`ℹ️  Active violation already exists for ${plateNumber} at ${cameraLocationId}`);
       violationId = existingViolation.id;
       isExistingViolation = true;
-      
-      // Check if SMS was already sent for this violation
-      const existingSmsLog = db.prepare(`
-        SELECT * FROM sms_logs 
-        WHERE violationId = ?
-        AND status IN ('sent', 'success')
-        ORDER BY sentAt DESC
-        LIMIT 1
-      `).get(existingViolation.id);
-      
-      if (existingSmsLog) {
-        console.log(`   ✅ SMS already sent for this violation (Log ID: ${existingSmsLog.id})`);
-        return {
-          ...existingViolation,
-          timeDetected: new Date(existingViolation.timeDetected),
-          timeIssued: existingViolation.timeIssued ? new Date(existingViolation.timeIssued) : null,
-          warningExpiresAt: existingViolation.warningExpiresAt ? new Date(existingViolation.warningExpiresAt) : null,
-          smsSent: true,
-          smsLogId: existingSmsLog.id
-        };
-      }
     } else {
       // Generate new violation ID
       violationId = `VIOL-${plateNumber}-${Date.now()}`;
@@ -108,125 +50,11 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
     
     // Set status to 'warning' (automatic violations start as warnings)
     const status = 'warning';
-    let expiresAt = null;
-    let smsSent = false;
-    let smsLogId = null;
     
-    // Send SMS if conditions are met
-    const smsCheck = shouldSendSMS(plateNumber, db);
-    
-    console.log(`📋 SMS Check for plate ${plateNumber}:`, {
-      shouldSend: smsCheck.shouldSend,
-      hasVehicle: !!smsCheck.vehicle,
-      reason: smsCheck.reason,
-      contactNumber: smsCheck.vehicle?.contactNumber
-    });
-    
-    if (smsCheck.shouldSend && smsCheck.vehicle) {
-      // Format and send SMS
-      const smsMessage = formatParkingWarningSMS(plateNumber, cameraLocationId);
-      const smsResult = await sendSMS(
-        smsCheck.vehicle.contactNumber,
-        smsMessage,
-        'PhilSMS'
-      );
-      
-      // Log SMS delivery status
-      smsLogId = `SMS-${violationId}-${Date.now()}`;
-      const sentAt = new Date().toISOString();
-      
-      // Store messageId in statusMessage for webhook matching
-      const statusMessage = smsResult.messageId 
-        ? `Message ID: ${smsResult.messageId} - ${smsResult.statusMessage || ''}`
-        : (smsResult.statusMessage || '');
-      
-      try {
-        db.prepare(`
-          INSERT INTO sms_logs (
-            id, violationId, plateNumber, contactNumber, message, 
-            status, statusMessage, sentAt, deliveredAt, error, retryCount, lastRetryAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          smsLogId,
-          violationId,
-          plateNumber,
-          smsCheck.vehicle.contactNumber,
-          smsMessage,
-          smsResult.status || 'unknown',
-          statusMessage,
-          sentAt,
-          smsResult.success ? sentAt : null,
-          smsResult.error || null,
-          0, // retryCount
-          null // lastRetryAt
-        );
-        
-        if (smsResult.success) {
-          smsSent = true;
-          console.log(`✅ SMS sent successfully to ${smsCheck.vehicle.contactNumber} for plate ${plateNumber}`);
-          console.log(`   Message ID: ${smsResult.messageId || 'N/A'}`);
-          
-          // Create notification for SMS sent
-          try {
-            // Get camera info from locationId
-            const camera = db.prepare('SELECT * FROM cameras WHERE locationId = ?').get(cameraLocationId);
-            const cameraId = camera?.id || null;
-            
-            const notificationId = `NOTIF-${violationId}-${Date.now()}`;
-            const notificationTitle = `SMS Warning Sent - ${plateNumber}`;
-            const notificationMessage = `SMS warning sent to vehicle owner for plate ${plateNumber} at location ${cameraLocationId}. Vehicle has 30 minutes to move.`;
-            
-            db.prepare(`
-              INSERT INTO notifications (
-                id, type, title, message, cameraId, locationId, 
-                incidentId, detectionId, imageUrl, imageBase64, 
-                plateNumber, timeDetected, reason, timestamp, read
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-              notificationId,
-              'sms_sent',
-              notificationTitle,
-              notificationMessage,
-              cameraId,
-              cameraLocationId,
-              null, // incidentId
-              detectionId,
-              null, // imageUrl
-              null, // imageBase64
-              plateNumber,
-              timeDetected,
-              'SMS warning sent to vehicle owner',
-              new Date().toISOString(),
-              0 // not read
-            );
-          } catch (notifError) {
-            console.error('Error creating notification:', notifError);
-          }
-        } else {
-          console.error(`❌ SMS FAILED for plate ${plateNumber}:`);
-          console.error(`   Error: ${smsResult.error || 'Unknown error'}`);
-          console.error(`   Status: ${smsResult.status || 'unknown'}`);
-          console.error(`   Status Message: ${smsResult.statusMessage || 'N/A'}`);
-          if (smsResult.responseData) {
-            console.error(`   API Response:`, JSON.stringify(smsResult.responseData, null, 2));
-          }
-        }
-      } catch (smsLogError) {
-        console.error('❌ Error logging SMS:', smsLogError);
-      }
-    } else {
-      console.warn(`⚠️  SMS NOT SENT for plate ${plateNumber}:`, {
-        reason: smsCheck.reason || 'Unknown reason',
-        shouldSend: smsCheck.shouldSend,
-        hasVehicle: !!smsCheck.vehicle,
-        vehicleExists: !!smsCheck.vehicle
-      });
-    }
-    
-    // Set warningExpiresAt to 30 minutes from now (timer starts after SMS is sent)
+    // Set warningExpiresAt to 30 minutes from now
     const expiresDate = new Date();
     expiresDate.setMinutes(expiresDate.getMinutes() + 30); // 30 minutes grace period
-    expiresAt = expiresDate.toISOString();
+    const expiresAt = expiresDate.toISOString();
     
     // Create violation only if it's a new violation
     if (!isExistingViolation) {
@@ -243,6 +71,20 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
         expiresAt
       );
       
+      // Send SMS to vehicle owner (only for new violations)
+      try {
+        const smsResult = await sendViolationSMS(plateNumber, cameraLocationId, violationId);
+        if (smsResult.success) {
+          smsSent = true;
+          smsLogId = smsResult.smsLogId;
+          console.log(`✅ SMS sent to owner for plate ${plateNumber} (Log ID: ${smsLogId})`);
+        } else {
+          console.log(`⚠️  SMS not sent for plate ${plateNumber}: ${smsResult.error}`);
+        }
+      } catch (smsError) {
+        console.error(`❌ Error sending SMS for plate ${plateNumber}:`, smsError);
+      }
+      
       // Create notification for new warning
       try {
         const camera = db.prepare('SELECT * FROM cameras WHERE locationId = ?').get(cameraLocationId);
@@ -250,7 +92,7 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
         
         const warningNotificationId = `NOTIF-WARNING-${violationId}-${Date.now()}`;
         const warningTitle = `New Warning - ${plateNumber}`;
-        const warningMessage = `Illegal parking detected for vehicle ${plateNumber} at ${cameraLocationId}. ${smsSent ? 'SMS sent to owner.' : 'SMS not sent.'} 30-minute grace period started.`;
+        const warningMessage = `Illegal parking detected for vehicle ${plateNumber} at ${cameraLocationId}. 30-minute grace period started.${smsSent ? ' SMS sent to owner.' : ' SMS could not be sent to owner.'}`;
         
         db.prepare(`
           INSERT INTO notifications (
@@ -279,14 +121,12 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
         console.error('Error creating warning notification:', notifError);
       }
     } else {
-      // Update existing violation's warningExpiresAt if SMS is being sent now
-      if (smsSent) {
-        db.prepare(`
-          UPDATE violations 
-          SET warningExpiresAt = ?
-          WHERE id = ?
-        `).run(expiresAt, violationId);
-      }
+      // Update existing violation's warningExpiresAt
+      db.prepare(`
+        UPDATE violations 
+        SET warningExpiresAt = ?
+        WHERE id = ?
+      `).run(expiresAt, violationId);
     }
 
     const violation = db.prepare('SELECT * FROM violations WHERE id = ?').get(violationId);
@@ -297,8 +137,8 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
       timeDetected: new Date(violation.timeDetected),
       timeIssued: violation.timeIssued ? new Date(violation.timeIssued) : null,
       warningExpiresAt: violation.warningExpiresAt ? new Date(violation.warningExpiresAt) : null,
-      smsSent: smsSent,
-      smsLogId: smsLogId
+      smsSent: smsSent || false,
+      smsLogId: smsLogId || null
     };
   } catch (error) {
     console.error(`❌ Error creating automatic violation for ${plateNumber}:`, error);
@@ -342,16 +182,99 @@ router.get('/', (req, res) => {
       params.push(`%${plateNumber}%`);
     }
     
-    query += ' ORDER BY timeDetected DESC';
+    // Add pagination limit (default 100, max 500)
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    query += ' ORDER BY timeDetected DESC LIMIT ?';
+    params.push(limit);
     
     const violations = db.prepare(query).all(...params);
     
-    res.json(violations.map(violation => ({
-      ...violation,
-      timeDetected: new Date(violation.timeDetected),
-      timeIssued: violation.timeIssued ? new Date(violation.timeIssued) : null,
-      warningExpiresAt: violation.warningExpiresAt ? new Date(violation.warningExpiresAt) : null
-    })));
+    // Optimize: Batch fetch cameras, vehicles, and detections to avoid N+1 queries
+    const locationIds = [...new Set(violations.map(v => v.cameraLocationId))];
+    const plateNumbers = [...new Set(violations.map(v => v.plateNumber).filter(p => p && p !== 'NONE' && p !== 'BLUR'))];
+    
+    // Batch fetch cameras
+    const camerasMap = new Map();
+    if (locationIds.length > 0) {
+      const placeholders = locationIds.map(() => '?').join(',');
+      const cameras = db.prepare(`SELECT id, locationId FROM cameras WHERE locationId IN (${placeholders})`).all(...locationIds);
+      cameras.forEach(camera => {
+        camerasMap.set(camera.locationId, camera.id);
+      });
+    }
+    
+    // Batch fetch vehicles
+    const vehiclesMap = new Map();
+    if (plateNumbers.length > 0) {
+      const placeholders = plateNumbers.map(() => '?').join(',');
+      const vehicles = db.prepare(`SELECT * FROM vehicles WHERE plateNumber IN (${placeholders})`).all(...plateNumbers);
+      vehicles.forEach(vehicle => {
+        vehiclesMap.set(vehicle.plateNumber, vehicle);
+      });
+    }
+    
+    // Batch fetch recent detections (last 30 minutes for all violations)
+    const detectionsMap = new Map();
+    if (locationIds.length > 0) {
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const cameraIds = Array.from(camerasMap.values());
+      if (cameraIds.length > 0) {
+        const placeholders = cameraIds.map(() => '?').join(',');
+        const detections = db.prepare(`
+          SELECT d.*, c.locationId 
+          FROM detections d
+          JOIN cameras c ON d.cameraId = c.id
+          WHERE d.cameraId IN (${placeholders})
+          AND d.timestamp >= ?
+          ORDER BY d.timestamp DESC
+        `).all(...cameraIds, thirtyMinutesAgo);
+        
+        // Group detections by violation key (plateNumber-locationId)
+        detections.forEach(detection => {
+          const key = `${detection.plateNumber}-${detection.locationId}`;
+          if (!detectionsMap.has(key)) {
+            detectionsMap.set(key, detection);
+          }
+        });
+      }
+    }
+    
+    // Enrich violations with batched data
+    const enrichedViolations = violations.map(violation => {
+      const cameraId = camerasMap.get(violation.cameraLocationId);
+      const detectionKey = `${violation.plateNumber}-${violation.cameraLocationId}`;
+      const detection = detectionsMap.get(detectionKey);
+      const vehicle = vehiclesMap.get(violation.plateNumber);
+      
+      // Build message based on violation type
+      let message = '';
+      if (violation.plateNumber === 'BLUR') {
+        message = `Vehicle illegally parked at location ${violation.cameraLocationId}. License plate is visible but unclear or blurry - cannot be read. Immediate Barangay attention required at ${violation.cameraLocationId}.`;
+      } else if (violation.plateNumber === 'NONE') {
+        message = `Vehicle illegally parked at location ${violation.cameraLocationId}. License plate is not visible or readable. Immediate Barangay attention required at ${violation.cameraLocationId}.`;
+      } else if (vehicle) {
+        message = `Vehicle with plate ${violation.plateNumber} detected illegally parked at ${violation.cameraLocationId}. ${vehicle.ownerName ? `Owner: ${vehicle.ownerName}.` : ''} Immediate action required.`;
+      } else {
+        message = `Vehicle with plate ${violation.plateNumber} detected illegally parked at ${violation.cameraLocationId}. Vehicle is not registered in the system. Immediate Barangay attention required.`;
+      }
+      
+      return {
+        ...violation,
+        timeDetected: new Date(violation.timeDetected),
+        timeIssued: violation.timeIssued ? new Date(violation.timeIssued) : null,
+        warningExpiresAt: violation.warningExpiresAt ? new Date(violation.warningExpiresAt) : null,
+        // Add detection image data
+        imageUrl: detection ? detection.imageUrl : null,
+        imageBase64: detection ? detection.imageBase64 : null,
+        // Add message
+        message: message,
+        // Add detection details
+        detectionId: detection ? detection.id : null,
+        vehicleType: detection ? detection.class_name : null
+      };
+    });
+    
+    res.json(enrichedViolations);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -468,73 +391,12 @@ router.post('/', async (req, res) => {
     const timeDetected = new Date().toISOString();
     
     // If status is 'warning' and warningExpiresAt is not provided, set it to 30 minutes from now
-    // Timer starts AFTER SMS is sent
     let expiresAt = warningExpiresAt;
-    let smsSent = false;
-    let smsLogId = null;
     
-    // Send SMS if status is 'warning' and conditions are met
-    if (status === 'warning') {
-      const smsCheck = shouldSendSMS(plateNumber, db);
-      
-      if (smsCheck.shouldSend && smsCheck.vehicle) {
-        // Format and send SMS
-        const smsMessage = formatParkingWarningSMS(plateNumber, cameraLocationId);
-        const smsResult = await sendSMS(
-          smsCheck.vehicle.contactNumber,
-          smsMessage,
-          'PhilSMS'
-        );
-        
-      // Log SMS delivery status
-      smsLogId = `SMS-${id}-${Date.now()}`;
-      const sentAt = new Date().toISOString();
-      
-      // Store messageId in statusMessage for webhook matching
-      const statusMessage = smsResult.messageId 
-        ? `Message ID: ${smsResult.messageId} - ${smsResult.statusMessage || ''}`
-        : (smsResult.statusMessage || '');
-      
-      try {
-        db.prepare(`
-          INSERT INTO sms_logs (
-            id, violationId, plateNumber, contactNumber, message, 
-            status, statusMessage, sentAt, deliveredAt, error, retryCount, lastRetryAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          smsLogId,
-          id,
-          plateNumber,
-          smsCheck.vehicle.contactNumber,
-          smsMessage,
-          smsResult.status || 'unknown',
-          statusMessage,
-          sentAt,
-          smsResult.success ? sentAt : null,
-          smsResult.error || null,
-          0, // retryCount
-          null // lastRetryAt
-        );
-          
-          if (smsResult.success) {
-            smsSent = true;
-            console.log(`✅ SMS sent to ${smsCheck.vehicle.contactNumber} for plate ${plateNumber}`);
-          } else {
-            console.warn(`⚠️  SMS failed for plate ${plateNumber}: ${smsResult.error}`);
-          }
-        } catch (smsLogError) {
-          console.error('❌ Error logging SMS:', smsLogError);
-        }
-      } else {
-        console.log(`ℹ️  SMS not sent for plate ${plateNumber}: ${smsCheck.reason || 'Unknown reason'}`);
-      }
-      
-      // Set warningExpiresAt to 30 minutes from now (timer starts after SMS is sent)
-      if (!expiresAt) {
-        const expiresDate = new Date();
-        expiresDate.setMinutes(expiresDate.getMinutes() + 30); // 30 minutes grace period
-        expiresAt = expiresDate.toISOString();
-      }
+    if (status === 'warning' && !expiresAt) {
+      const expiresDate = new Date();
+      expiresDate.setMinutes(expiresDate.getMinutes() + 30); // 30 minutes grace period
+      expiresAt = expiresDate.toISOString();
     }
     
     db.prepare(`
@@ -555,9 +417,7 @@ router.post('/', async (req, res) => {
       ...violation,
       timeDetected: new Date(violation.timeDetected),
       timeIssued: violation.timeIssued ? new Date(violation.timeIssued) : null,
-      warningExpiresAt: violation.warningExpiresAt ? new Date(violation.warningExpiresAt) : null,
-      smsSent: smsSent,
-      smsLogId: smsLogId
+      warningExpiresAt: violation.warningExpiresAt ? new Date(violation.warningExpiresAt) : null
     };
     
     res.status(201).json(response);

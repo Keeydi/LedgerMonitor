@@ -190,7 +190,7 @@ export function Header({ title, subtitle }: HeaderProps) {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   className="justify-center text-primary cursor-pointer"
-                  onClick={() => navigate('/notifications')}
+                  onClick={() => navigate('/warnings')}
                 >
                   View all notifications
                 </DropdownMenuItem>

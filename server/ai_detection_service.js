@@ -81,7 +81,7 @@ export async function analyzeImageWithAI(imageBase64 = null, imagePath = null) {
       env: {
         ...process.env,
         // Use environment variable if set, otherwise use fallback (matches Python service)
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'AIzaSyAWuTY_Ixt2z2HyqWwzkEJtqd7mdYcHgaM',
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'AIzaSyDxmU44BbAVjwVnzvOCIk3zD5UAoLS9PF4',
         PYTHONUNBUFFERED: '1' // Ensure real-time output
       }
     });
@@ -214,11 +214,19 @@ export function processDetectionResults(aiResult, cameraId, imageUrl, imageBase6
   // Process each detected vehicle
   aiResult.vehicles.forEach((vehicle, index) => {
     const detectionId = `DET-${cameraId}-${timestampId}-${index}`;
-    const plateNumber = vehicle.plateNumber || 'NONE';
+    let plateNumber = vehicle.plateNumber || 'NONE';
     
-    // Determine plate visibility: if plateNumber is 'NONE', plate is not visible
-    // Otherwise, use the plateVisible flag from AI (default to true if not specified)
+    // Normalize plate number: handle "BLUR" for visible but unreadable plates
+    if (plateNumber.toUpperCase() === 'BLUR' || plateNumber.toUpperCase() === 'UNCLEAR') {
+      plateNumber = 'BLUR';
+    }
+    
+    // Determine plate visibility:
+    // - 'NONE' = plate area not visible at all
+    // - 'BLUR' = plate area visible but blurry/unclear/unreadable
+    // - valid plate = plate is readable
     const plateVisible = plateNumber !== 'NONE' && 
+                        plateNumber !== 'BLUR' &&
                         plateNumber !== null && 
                         plateNumber !== '' &&
                         (vehicle.plateVisible !== false);

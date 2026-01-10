@@ -307,7 +307,7 @@ export default function Vehicles() {
                     value={formData.hostId || undefined} 
                     onValueChange={handleHostChange}
                   >
-                    <SelectTrigger className="bg-secondary">
+                    <SelectTrigger id="hostId" className="bg-secondary">
                       <SelectValue placeholder="Select a host" />
                     </SelectTrigger>
                     <SelectContent>

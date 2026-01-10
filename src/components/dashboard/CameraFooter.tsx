@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 
 interface CameraFooterProps {
   isOnline: boolean;
-  captureStatus: 'counting' | 'sending' | 'waiting';
+  captureStatus: 'counting' | 'sending' | 'waiting' | 'processing';
   nextCaptureTime: number;
   onRefresh: () => void;
   onFullscreen: () => void;
@@ -26,9 +26,11 @@ export const CameraFooter = memo(function CameraFooter({
   const statusText = isOnline
     ? captureStatus === 'sending'
       ? 'Sending Captured image...'
-      : captureStatus === 'waiting'
-        ? `Next capture in ${formatTime(nextCaptureTime)}`
-        : `Capturing in ${formatTime(nextCaptureTime)}`
+      : captureStatus === 'processing'
+        ? `AI Processing... ${formatTime(nextCaptureTime)}`
+        : captureStatus === 'waiting'
+          ? `Next capture in ${formatTime(nextCaptureTime)}`
+          : `Capturing in ${formatTime(nextCaptureTime)}`
     : 'Camera offline';
 
   return (

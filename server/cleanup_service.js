@@ -27,7 +27,7 @@ class CleanupService {
       return;
     }
 
-    console.log(`🧹 Starting cleanup service (runs every 6 hours, deletes empty detections older than ${this.DETECTION_RETENTION_HOURS} hours)`);
+    console.log('🧹 Cleanup service started');
     this.isRunning = true;
     
     // Run immediately on start, then every 6 hours
@@ -52,8 +52,6 @@ class CleanupService {
    */
   async cleanupEmptyDetections() {
     try {
-      console.log('🧹 Starting cleanup of empty detections...');
-      
       // Calculate cutoff time (24 hours ago)
       const cutoffTime = new Date();
       cutoffTime.setHours(cutoffTime.getHours() - this.DETECTION_RETENTION_HOURS);
@@ -70,11 +68,8 @@ class CleanupService {
       `).all(cutoffISO);
       
       if (emptyDetections.length === 0) {
-        console.log('✅ No empty detections to clean up');
         return;
       }
-      
-      console.log(`📋 Found ${emptyDetections.length} empty detection(s) older than ${this.DETECTION_RETENTION_HOURS} hours`);
       
       let deletedCount = 0;
       let imageDeletedCount = 0;
@@ -117,7 +112,9 @@ class CleanupService {
         }
       }
       
-      console.log(`✅ Cleanup complete: Deleted ${deletedCount} empty detection(s), ${imageDeletedCount} image(s), ${imageErrorCount} image error(s)`);
+      if (deletedCount > 0) {
+        console.log(`🧹 Cleanup: Deleted ${deletedCount} empty detection(s), ${imageDeletedCount} image(s)`);
+      }
       
     } catch (error) {
       console.error('❌ Cleanup service error:', error);

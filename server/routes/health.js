@@ -2,9 +2,8 @@ import express from 'express';
 import db from '../database.js';
 import { analyzeImageWithAI } from '../ai_detection_service.js';
 import monitoringService from '../monitoring_service.js';
-import smsRetryService from '../sms_retry_service.js';
-import smsPollingService from '../sms_polling_service.js';
 import cleanupService from '../cleanup_service.js';
+import { getSMSServiceStatus } from '../utils/smsService.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs-extra';
@@ -48,7 +47,7 @@ async function checkDatabase() {
     const tableNames = tablesResult.map(row => row.name);
     
     // Check required tables
-    const requiredTables = ['vehicles', 'cameras', 'violations', 'detections', 'notifications', 'incidents', 'sms_logs', 'users'];
+    const requiredTables = ['vehicles', 'cameras', 'violations', 'detections', 'notifications', 'incidents', 'users'];
     const missingTables = requiredTables.filter(table => !tableNames.includes(table));
     
     // Get record counts
@@ -166,56 +165,16 @@ async function checkAIService() {
   }
 }
 
-// Check SMS service health
-function checkSMSService() {
-  // Check environment variable first, then .env file
-  const envVars = readEnvFile();
-  const apiToken = process.env.PHILSMS_API_TOKEN || envVars.PHILSMS_API_TOKEN;
-  const hasToken = !!apiToken;
-  const tokenSource = process.env.PHILSMS_API_TOKEN ? 'environment' : (envVars.PHILSMS_API_TOKEN ? 'env_file' : 'none');
-  
-  return {
-    status: hasToken ? 'healthy' : 'degraded',
-    configured: hasToken,
-    tokenSource: tokenSource,
-    message: hasToken 
-      ? `SMS service configured (from ${tokenSource === 'environment' ? 'environment variable' : '.env file'})` 
-      : 'PHILSMS_API_TOKEN not set',
-    provider: 'PhilSMS'
-  };
-}
-
 // Check monitoring services
 function checkMonitoringServices() {
   return {
     monitoring: {
       status: monitoringService.isRunning ? 'healthy' : 'unhealthy',
       running: monitoringService.isRunning,
-      interval: '15 minutes',
+      interval: '15 seconds',
       message: monitoringService.isRunning 
         ? 'Monitoring service is running' 
         : 'Monitoring service is not running'
-    },
-    smsRetry: {
-      status: smsRetryService.isRunning ? 'healthy' : 'unhealthy',
-      running: smsRetryService.isRunning,
-      interval: '5 minutes',
-      message: smsRetryService.isRunning 
-        ? 'SMS retry service is running' 
-        : 'SMS retry service is not running'
-    },
-    smsPolling: {
-      status: process.env.ENABLE_SMS_POLLING === 'true' 
-        ? (smsPollingService.isRunning ? 'healthy' : 'unhealthy')
-        : 'disabled',
-      running: smsPollingService.isRunning,
-      enabled: process.env.ENABLE_SMS_POLLING === 'true',
-      interval: '5 minutes',
-      message: process.env.ENABLE_SMS_POLLING === 'true'
-        ? (smsPollingService.isRunning 
-            ? 'SMS polling service is running' 
-            : 'SMS polling service is not running')
-        : 'SMS polling service is disabled (webhooks recommended)'
     },
     cleanup: {
       status: cleanupService.isRunning ? 'healthy' : 'unhealthy',
@@ -225,6 +184,18 @@ function checkMonitoringServices() {
       message: cleanupService.isRunning 
         ? 'Cleanup service is running (deletes empty detections older than 24 hours)' 
         : 'Cleanup service is not running'
+    },
+    smsRetry: {
+      status: 'healthy',
+      running: false,
+      interval: 'Not implemented',
+      message: 'SMS retry service not yet implemented'
+    },
+    smsPolling: {
+      status: 'healthy',
+      enabled: false,
+      interval: 'Not implemented',
+      message: 'SMS polling service not yet implemented'
     }
   };
 }
@@ -269,22 +240,21 @@ router.post('/cleanup', async (req, res) => {
 // GET /api/health/status - Comprehensive health check
 router.get('/status', async (req, res) => {
   try {
-    const [database, aiService, smsService, systemInfo] = await Promise.all([
+    const [database, aiService, systemInfo] = await Promise.all([
       checkDatabase(),
       checkAIService(),
-      Promise.resolve(checkSMSService()),
       Promise.resolve(checkSystemInfo())
     ]);
     
     const monitoringServices = checkMonitoringServices();
+    const smsService = getSMSServiceStatus();
     
     // Calculate overall status
     const statuses = [
       database.status,
       aiService.status,
       smsService.status,
-      monitoringServices.monitoring.status,
-      monitoringServices.smsRetry.status
+      monitoringServices.monitoring.status
     ];
     
     const overallStatus = statuses.every(s => s === 'healthy') 

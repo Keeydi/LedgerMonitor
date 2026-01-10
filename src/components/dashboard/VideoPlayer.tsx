@@ -36,7 +36,23 @@ export const VideoPlayer = memo(forwardRef<VideoPlayerHandle, VideoPlayerProps>(
   useImperativeHandle(ref, () => ({
     captureFrame: async () => {
       const videoElement = videoRef.current;
-      if (!videoElement || !stream || videoElement.readyState < 2) {
+      
+      // Wait for video to be ready (with timeout)
+      if (!videoElement || !stream) {
+        console.warn('⚠️  Cannot capture: video element or stream not available');
+        return null;
+      }
+
+      // Wait for video to be ready (readyState 2 = HAVE_CURRENT_DATA, 4 = HAVE_ENOUGH_DATA)
+      const maxWaitTime = 3000; // 3 seconds max wait
+      const startTime = Date.now();
+      
+      while (videoElement.readyState < 2 && (Date.now() - startTime) < maxWaitTime) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      if (videoElement.readyState < 2) {
+        console.warn(`⚠️  Video not ready after ${maxWaitTime}ms (readyState: ${videoElement.readyState})`);
         return null;
       }
 
@@ -48,6 +64,7 @@ export const VideoPlayer = memo(forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         const ctx = canvas.getContext('2d');
         
         if (!ctx) {
+          console.warn('⚠️  Cannot get canvas context');
           return null;
         }
 
@@ -56,9 +73,10 @@ export const VideoPlayer = memo(forwardRef<VideoPlayerHandle, VideoPlayerProps>(
         
         // Convert to base64
         const base64 = canvas.toDataURL('image/jpeg', 0.9);
+        console.log(`✅ Frame captured: ${canvas.width}x${canvas.height}, size: ${Math.round(base64.length / 1024)}KB`);
         return base64;
       } catch (error) {
-        console.error('Error capturing frame:', error);
+        console.error('❌ Error capturing frame:', error);
         return null;
       }
     },

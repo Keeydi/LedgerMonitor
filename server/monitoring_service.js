@@ -1,9 +1,8 @@
 import db from './database.js';
-import { sendSMS, formatParkingWarningSMS, shouldSendSMS } from './sms_service.js';
 import { shouldCreateNotification } from './routes/notifications.js';
 
 /**
- * Monitoring service that runs every 15 minutes to:
+ * Monitoring service that runs every 15 seconds to:
  * 1. Check if vehicles in warnings have been removed (mark as resolved)
  * 2. Check if warnings have expired and vehicle is still present (notify Barangay)
  */
@@ -11,7 +10,7 @@ class MonitoringService {
   constructor() {
     this.intervalId = null;
     this.isRunning = false;
-    this.RECHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+    this.RECHECK_INTERVAL_MS = 15 * 1000; // 15 seconds
   }
 
   start() {
@@ -20,10 +19,10 @@ class MonitoringService {
       return;
     }
 
-    console.log('🔄 Starting monitoring service (15-minute recheck interval)');
+    console.log('🔄 Monitoring service started');
     this.isRunning = true;
     
-    // Run immediately on start, then every 15 minutes
+    // Run immediately on start, then every 15 seconds
     this.checkAndUpdate();
     this.intervalId = setInterval(() => {
       this.checkAndUpdate();
@@ -104,8 +103,6 @@ class MonitoringService {
 
   async checkAndUpdate() {
     try {
-      console.log('🔍 Running monitoring check...');
-      
       // Get all active warnings
       const activeWarnings = db.prepare(`
         SELECT * FROM violations 
@@ -113,13 +110,11 @@ class MonitoringService {
       `).all();
 
       if (activeWarnings.length === 0) {
-        console.log('✅ No active warnings to monitor');
         return;
       }
 
-      console.log(`📋 Checking ${activeWarnings.length} active warning(s)...`);
-
       // Get all recent detections (last 15 minutes) with their camera locations
+      // Exclude 'NONE' (not visible) and 'BLUR' (blurry) - only count readable plates
       const fifteenMinutesAgo = new Date();
       fifteenMinutesAgo.setMinutes(fifteenMinutesAgo.getMinutes() - 15);
       const recentDetections = db.prepare(`
@@ -128,6 +123,7 @@ class MonitoringService {
         JOIN cameras c ON d.cameraId = c.id
         WHERE d.timestamp > ? 
         AND d.plateNumber != 'NONE'
+        AND d.plateNumber != 'BLUR'
         AND d.class_name != 'none'
       `).all(fifteenMinutesAgo.toISOString());
 
@@ -177,16 +173,8 @@ class MonitoringService {
           `).get(warning.plateNumber, warning.cameraLocationId);
 
           if (!existingNotification) {
-            // Check if SMS was sent for this violation (to determine if vehicle ignored SMS)
-            const smsLog = db.prepare(`
-              SELECT * FROM sms_logs 
-              WHERE violationId = ? 
-              AND status = 'sent'
-              ORDER BY sentAt DESC 
-              LIMIT 1
-            `).get(warning.id);
-            
-            const vehicleIgnoredSMS = smsLog !== undefined; // SMS was sent but vehicle still present
+            // Vehicle is still present after grace period
+            const vehicleStillPresent = true;
             
             // Get the most recent detection for this plate at this location
             const camera = db.prepare(`
@@ -205,6 +193,7 @@ class MonitoringService {
                 WHERE cameraId = ? 
                 AND plateNumber = ? 
                 AND plateNumber != 'NONE'
+                AND plateNumber != 'BLUR'
                 AND class_name != 'none'
                 ORDER BY timestamp DESC 
                 LIMIT 1
@@ -224,12 +213,8 @@ class MonitoringService {
             if (userId && shouldCreateNotification(userId, 'warning_expired')) {
               // Create notification
               const notificationId = `NOTIF-${Date.now()}-${warning.id}`;
-              const notificationTitle = vehicleIgnoredSMS 
-                ? 'Vehicle Ignored SMS Warning' 
-                : 'Vehicle Still Present After Warning';
-              const notificationMessage = vehicleIgnoredSMS
-                ? `Vehicle with plate ${warning.plateNumber} ignored SMS warning and is still illegally parked at ${warning.cameraLocationId} after the 30-minute grace period. Immediate Barangay action required.`
-                : `Vehicle with plate ${warning.plateNumber} is still illegally parked at ${warning.cameraLocationId} after the 30-minute grace period. Immediate Barangay action required.`;
+              const notificationTitle = 'Vehicle Still Present After Warning';
+              const notificationMessage = `Vehicle with plate ${warning.plateNumber} is still illegally parked at ${warning.cameraLocationId} after the 30-minute grace period. Immediate Barangay action required.`;
 
               try {
                 db.prepare(`
@@ -251,9 +236,7 @@ class MonitoringService {
                   imageBase64,
                   warning.plateNumber,
                   warning.timeDetected,
-                  vehicleIgnoredSMS 
-                    ? 'Vehicle ignored SMS warning after 30 minutes'
-                    : 'Vehicle still present after 30 minutes',
+                  'Vehicle still present after 30 minutes',
                   new Date().toISOString(),
                   0 // not read
                 );

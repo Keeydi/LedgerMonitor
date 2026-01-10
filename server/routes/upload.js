@@ -154,12 +154,15 @@ router.post('/analyze', async (req, res) => {
         savedDetections.push(detection.id);
         
         // Check if plate is NOT visible/readable
+        // 'NONE' = not visible, 'BLUR' = visible but blurry/unclear
         const plateNotVisible = (
           detection.plateNumber === 'NONE' || 
+          detection.plateNumber === 'BLUR' ||
           detection.plateNumber === null || 
           detection.plateNumber === '' ||
           detection.plateVisible === false
         );
+        const plateIsBlurry = detection.plateNumber === 'BLUR';
         
         // Check if it's a real vehicle (not 'none' class)
         const isRealVehicle = detection.class_name && detection.class_name.toLowerCase() !== 'none';
@@ -259,9 +262,21 @@ router.post('/analyze', async (req, res) => {
         
         // Case 2: Real vehicle with unreadable plate - create incident and notify barangay
         if (isRealVehicle && plateNotVisible) {
+          // Determine plate status
+          const plateStatus = plateIsBlurry ? 'BLUR' : 'NONE';
+          const plateStatusText = plateIsBlurry 
+            ? 'Unclear or Blur Plate Number Detected' 
+            : 'Plate Not Visible';
+          const plateReason = plateIsBlurry
+            ? 'Plate area is visible but blurry/unclear/unreadable'
+            : 'Plate not visible or absent';
+          const plateMessage = plateIsBlurry
+            ? `Vehicle detected at ${uploadLocationId}. License plate is visible but unclear or blurry - cannot be read. Immediate Barangay attention required.`
+            : `Vehicle detected at ${uploadLocationId} but license plate is not visible or readable. Immediate Barangay attention required.`;
+          
           // Add to detected vehicles list (plate not visible)
           detectedVehicles.push({
-            plateNumber: 'NONE',
+            plateNumber: plateStatus,
             ownerName: null,
             contactNumber: null,
             registered: false,
@@ -276,54 +291,55 @@ router.post('/analyze', async (req, res) => {
               detection.cameraId,
               uploadLocationId,
               detection.id,
-              detection.plateNumber || 'NONE',
+              detection.plateNumber || plateStatus,
               detection.timestamp,
-              'Plate not visible or unreadable',
+              plateReason,
               detection.imageUrl,
               detection.imageBase64,
               'open'
             );
             incidentsCreated.push(incidentId);
-            console.log(`📝 Incident logged: ${incidentId} - Plate not visible`);
+            console.log(`📝 Incident logged: ${incidentId} - ${plateStatusText}`);
           } catch (incidentError) {
             console.error(`Failed to create incident:`, incidentError);
           }
           
-          // Check notification preferences before creating notification
+          // ALWAYS notify Barangay (no preference check)
           const user = db.prepare('SELECT id FROM users LIMIT 1').get();
           const userId = user ? user.id : null;
           
-          if (userId && shouldCreateNotification(userId, 'plate_not_visible')) {
+          if (userId) {
             // Create notification for Barangay
             const notificationId = `NOTIF-UPLOAD-${Date.now()}`;
-            const notificationTitle = 'Unreadable License Plate Detected';
-            const notificationMessage = `Vehicle detected at ${uploadLocationId} but license plate is not visible or readable. Immediate Barangay attention required.`;
+            const notificationTitle = plateIsBlurry
+              ? 'Illegally Parked Vehicle - Unclear/Blur Plate'
+              : 'Unreadable License Plate Detected';
             
             try {
               statements.createNotification.run(
                 notificationId,
                 'plate_not_visible',
                 notificationTitle,
-                notificationMessage,
+                plateMessage,
                 detection.cameraId,
                 uploadLocationId,
                 incidentId,
                 detection.id,
                 detection.imageUrl,
                 detection.imageBase64,
-                detection.plateNumber || 'NONE',
+                detection.plateNumber || plateStatus,
                 detection.timestamp,
-                'Plate not visible or unreadable',
+                plateReason,
                 new Date().toISOString(),
                 0 // not read
               );
               notificationsCreated.push(notificationId);
-              console.log(`🔔 Notification created: ${notificationId} - Barangay alerted`);
+              console.log(`🔔 Notification ALWAYS sent to authorities: ${notificationId} - ${plateStatusText}`);
             } catch (notifError) {
               console.error(`Failed to create notification:`, notifError);
             }
           } else {
-            console.log(`ℹ️  Notification skipped (preferences disabled or no user): plate_not_visible`);
+            console.error(`❌ No user found - cannot send notification to authorities`);
           }
         }
       } catch (dbError) {

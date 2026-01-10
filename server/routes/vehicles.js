@@ -1,6 +1,7 @@
 import express from 'express';
 import db from '../database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { normalizePhoneNumber } from '../utils/phoneUtils.js';
 
 const router = express.Router();
 
@@ -74,10 +75,19 @@ router.post('/', (req, res) => {
       }
     }
     
+    // Normalize contact number to 63XXXXXXXXX format (international) for consistent storage
+    const normalizedContact = normalizePhoneNumber(finalContactNumber);
+    if (!normalizedContact) {
+      return res.status(400).json({ 
+        error: 'Invalid contact number format',
+        details: 'Contact number must be in format: 63XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX, or 09XXXXXXXXX (will be converted to 63XXXXXXXXX)'
+      });
+    }
+    
     db.prepare(`
       INSERT INTO vehicles (id, plateNumber, ownerName, contactNumber, registeredAt, dataSource, hostId, rented, purposeOfVisit)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, plateNumber, ownerName, finalContactNumber, registeredAt, vehicleDataSource, hostId || null, rented || null, purposeOfVisit);
+    `).run(id, plateNumber, ownerName, normalizedContact, registeredAt, vehicleDataSource, hostId || null, rented || null, purposeOfVisit);
 
     const vehicle = db.prepare('SELECT * FROM vehicles WHERE id = ?').get(id);
     res.status(201).json({
@@ -112,6 +122,18 @@ router.put('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
       }
     }
 
+    // Normalize contact number if it's being updated
+    let normalizedContact = finalContactNumber;
+    if (contactNumber !== undefined) {
+      normalizedContact = normalizePhoneNumber(finalContactNumber);
+      if (!normalizedContact) {
+        return res.status(400).json({ 
+          error: 'Invalid contact number format',
+          details: 'Contact number must be in format: 09XXXXXXXXX, +639XXXXXXXXX, or 639XXXXXXXXX'
+        });
+      }
+    }
+
     db.prepare(`
       UPDATE vehicles 
       SET plateNumber = ?, ownerName = ?, contactNumber = ?, hostId = ?, rented = ?, purposeOfVisit = ?
@@ -119,7 +141,7 @@ router.put('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
     `).run(
       plateNumber !== undefined ? plateNumber : vehicle.plateNumber,
       ownerName !== undefined ? ownerName : vehicle.ownerName,
-      finalContactNumber,
+      normalizedContact,
       hostId !== undefined ? (hostId || null) : vehicle.hostId,
       rented !== undefined ? (rented || null) : vehicle.rented,
       purposeOfVisit !== undefined ? purposeOfVisit : vehicle.purposeOfVisit,

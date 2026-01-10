@@ -108,10 +108,17 @@ See `server/README_PYTHON_SETUP.md` for detailed setup instructions.
 
 ## Environment Variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file in the server directory:
 ```
 VITE_API_URL=http://localhost:3001/api
+GEMINI_API_KEY=your_gemini_api_key_here
+PHILSMS_API_TOKEN=your_philsms_api_token_here
 ```
+
+**SMS Configuration:**
+- `PHILSMS_API_TOKEN`: Your PhilSMS API token (Bearer token format: `895|H7NndPV0RXF7RUgXRYEbUJXHAqnq7lsydykFXsNT1af7cccb`)
+- The SMS service will automatically send notifications to vehicle owners when illegal parking is detected
+- SMS is sent only for registered vehicles with valid contact numbers
 
 ## Production Build
 

@@ -22,11 +22,15 @@ function getStatements() {
 }
 
 // GET all detections for a camera
-// Optional query parameter: minConfidence (default: 0.0, recommended: 0.8 for ≥80% threshold)
+// Optional query parameters: minConfidence (default: 0.0, recommended: 0.8 for ≥80% threshold), limit (default: 100, max: 500)
 router.get('/camera/:cameraId', (req, res) => {
   try {
     const statements = getStatements();
-    const detections = statements.getByCamera.all(req.params.cameraId);
+    let detections = statements.getByCamera.all(req.params.cameraId);
+    
+    // Apply pagination limit (default 100, max 500)
+    const maxLimit = Math.min(parseInt(req.query.limit) || 100, 500);
+    detections = detections.slice(0, maxLimit);
     
     // Apply confidence threshold if specified (≥80% = 0.8)
     const minConfidence = req.query.minConfidence ? parseFloat(req.query.minConfidence) : 0.0;

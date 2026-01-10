@@ -39,8 +39,12 @@ async function initDatabase() {
   
   db = buffer ? new SQL.Database(buffer) : new SQL.Database();
   
-  // Enable foreign keys
+  // Enable foreign keys and optimize SQLite settings
   db.run('PRAGMA foreign_keys = ON');
+  db.run('PRAGMA journal_mode = WAL'); // Write-Ahead Logging for better concurrency
+  db.run('PRAGMA synchronous = NORMAL'); // Balance between safety and performance
+  db.run('PRAGMA cache_size = -64000'); // 64MB cache
+  db.run('PRAGMA temp_store = MEMORY'); // Store temp tables in memory
   
   // Create hosts table
   db.run(`
@@ -72,7 +76,6 @@ async function initDatabase() {
   // Migrate existing vehicles table to add dataSource column if needed
   try {
     db.run('ALTER TABLE vehicles ADD COLUMN dataSource TEXT NOT NULL DEFAULT \'barangay\'');
-    console.log('✅ Added dataSource column to vehicles table');
   } catch (error) {
     // Column already exists or table doesn't exist yet - that's fine
     const errorMsg = error?.message || String(error);
@@ -84,7 +87,6 @@ async function initDatabase() {
   // Update existing vehicles without dataSource to have barangay as source
   try {
     db.run(`UPDATE vehicles SET dataSource = 'barangay' WHERE dataSource IS NULL OR dataSource = ''`);
-    console.log('✅ Updated existing vehicles to barangay data source');
   } catch (error) {
     // Ignore errors
   }
@@ -92,7 +94,6 @@ async function initDatabase() {
   // Migrate existing vehicles table to add hostId, rented, and purposeOfVisit columns if needed
   try {
     db.run('ALTER TABLE vehicles ADD COLUMN hostId TEXT');
-    console.log('✅ Added hostId column to vehicles table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -102,7 +103,6 @@ async function initDatabase() {
 
   try {
     db.run('ALTER TABLE vehicles ADD COLUMN rented TEXT');
-    console.log('✅ Added rented column to vehicles table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -112,7 +112,6 @@ async function initDatabase() {
 
   try {
     db.run('ALTER TABLE vehicles ADD COLUMN purposeOfVisit TEXT');
-    console.log('✅ Added purposeOfVisit column to vehicles table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -136,7 +135,6 @@ async function initDatabase() {
   // Migrate existing cameras table to add new columns if needed
   try {
     db.run('ALTER TABLE cameras ADD COLUMN isFixed INTEGER NOT NULL DEFAULT 1');
-    console.log('✅ Added isFixed column to cameras table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -146,7 +144,6 @@ async function initDatabase() {
   
   try {
     db.run('ALTER TABLE cameras ADD COLUMN illegalParkingZone INTEGER NOT NULL DEFAULT 1');
-    console.log('✅ Added illegalParkingZone column to cameras table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -158,7 +155,6 @@ async function initDatabase() {
   try {
     db.run(`UPDATE cameras SET isFixed = 1 WHERE isFixed IS NULL`);
     db.run(`UPDATE cameras SET illegalParkingZone = 1 WHERE illegalParkingZone IS NULL`);
-    console.log('✅ Updated existing cameras to fixed and illegal parking zone');
   } catch (error) {
     // Ignore errors
   }
@@ -179,7 +175,7 @@ async function initDatabase() {
   // Migrate existing violations table to add 'resolved' status if needed
   try {
     // SQLite doesn't support ALTER TABLE to modify CHECK constraint, so we'll handle it in application logic
-    console.log('✅ Violations table supports resolved status');
+    // Violations table supports resolved status
   } catch (error) {
     // Ignore errors
   }
@@ -252,7 +248,6 @@ async function initDatabase() {
   // Migrate existing sms_logs table to add retry columns if needed
   try {
     db.run('ALTER TABLE sms_logs ADD COLUMN retryCount INTEGER NOT NULL DEFAULT 0');
-    console.log('✅ Added retryCount column to sms_logs table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -262,7 +257,6 @@ async function initDatabase() {
   
   try {
     db.run('ALTER TABLE sms_logs ADD COLUMN lastRetryAt TEXT');
-    console.log('✅ Added lastRetryAt column to sms_logs table');
   } catch (error) {
     const errorMsg = error?.message || String(error);
     if (!errorMsg.includes('duplicate column name') && !errorMsg.includes('no such table')) {
@@ -307,7 +301,7 @@ async function initDatabase() {
         // User might already have preferences
       }
     }
-    console.log('✅ Notification preferences initialized for existing users');
+    // Notification preferences initialized
   } catch (error) {
     // Ignore errors
   }
@@ -315,7 +309,6 @@ async function initDatabase() {
   // Migrate existing users table to add role column if needed
   try {
     db.run('ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT \'barangay_user\'');
-    console.log('✅ Added role column to users table');
   } catch (error) {
     // Column already exists or table doesn't exist yet - that's fine
     const errorMsg = error?.message || String(error);
@@ -327,7 +320,6 @@ async function initDatabase() {
   // Update existing users without role to have barangay_user role
   try {
     db.run(`UPDATE users SET role = 'barangay_user' WHERE role IS NULL OR role = ''`);
-    console.log('✅ Updated existing users to barangay_user role');
   } catch (error) {
     // Ignore errors
   }
@@ -339,7 +331,6 @@ async function initDatabase() {
   // Try to add columns - if they exist, the error will be caught and ignored
   try {
     db.run('ALTER TABLE detections ADD COLUMN bbox TEXT');
-    console.log('✅ Added bbox column to detections table');
   } catch (error) {
     // Column already exists or table doesn't exist yet - that's fine
     const errorMsg = error?.message || String(error);
@@ -350,7 +341,6 @@ async function initDatabase() {
   
   try {
     db.run('ALTER TABLE detections ADD COLUMN class_name TEXT');
-    console.log('✅ Added class_name column to detections table');
   } catch (error) {
     // Column already exists or table doesn't exist yet - that's fine
     const errorMsg = error?.message || String(error);
@@ -361,7 +351,6 @@ async function initDatabase() {
   
   try {
     db.run('ALTER TABLE detections ADD COLUMN imageBase64 TEXT');
-    console.log('✅ Added imageBase64 column to detections table');
   } catch (error) {
     // Column already exists or table doesn't exist yet - that's fine
     const errorMsg = error?.message || String(error);
@@ -389,10 +378,34 @@ async function initDatabase() {
     )
   `);
   
-  // Create index for faster queries
+  // Create indexes for faster queries
   try {
+    // Audit logs indexes
     db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_userId ON audit_logs(userId)');
     db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp)');
+    
+    // Violations indexes (frequently queried)
+    db.run('CREATE INDEX IF NOT EXISTS idx_violations_status ON violations(status)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_violations_location ON violations(cameraLocationId)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_violations_plate ON violations(plateNumber)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_violations_timeDetected ON violations(timeDetected)');
+    
+    // Detections indexes (frequently queried)
+    db.run('CREATE INDEX IF NOT EXISTS idx_detections_cameraId ON detections(cameraId)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_detections_timestamp ON detections(timestamp)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_detections_plateNumber ON detections(plateNumber)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_detections_class_name ON detections(class_name)');
+    
+    // Notifications indexes
+    db.run('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_notifications_timestamp ON notifications(timestamp)');
+    db.run('CREATE INDEX IF NOT EXISTS idx_notifications_locationId ON notifications(locationId)');
+    
+    // Vehicles indexes
+    db.run('CREATE INDEX IF NOT EXISTS idx_vehicles_plateNumber ON vehicles(plateNumber)');
+    
+    // Cameras indexes
+    db.run('CREATE INDEX IF NOT EXISTS idx_cameras_locationId ON cameras(locationId)');
     db.run('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
   } catch (error) {
     // Indexes might already exist
@@ -401,7 +414,7 @@ async function initDatabase() {
   // Save database to file
   saveDatabase();
   
-  console.log('📊 Database initialized');
+  // Database initialized
 }
 
 // Seed users function - called after database initialization
@@ -422,9 +435,7 @@ async function seedUsers() {
       // Admin user exists, ensure role is correct
       if (adminUser.role !== 'admin') {
         dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('admin', adminEmail);
-        console.log('✅ Updated existing Admin user role');
-      } else {
-        console.log('ℹ️  Admin user already exists');
+        // Admin user role updated
       }
     } else {
       // Create new Admin user
@@ -433,9 +444,7 @@ async function seedUsers() {
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(adminUserId, adminEmail, adminPasswordHash, 'Admin User', 'admin', now);
       
-      console.log('✅ Seeded Admin user: admin@admin.com');
-      console.log('   Password: admin123!');
-      console.log('   Role: admin');
+      // Admin user seeded
     }
     
     // Seed Barangay user
@@ -450,9 +459,7 @@ async function seedUsers() {
       // Barangay user exists, ensure role is correct
       if (barangayUser.role !== 'barangay_user') {
         dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('barangay_user', barangayEmail);
-        console.log('✅ Updated existing Barangay user role');
-      } else {
-        console.log('ℹ️  Barangay user already exists');
+        // Barangay user role updated
       }
     } else {
       // Check if USER-001 exists (might be old admin user)
@@ -466,9 +473,7 @@ async function seedUsers() {
           WHERE id = ?
         `).run(barangayEmail, barangayPasswordHash, 'Barangay User', 'barangay_user', barangayUserId);
         
-        console.log('✅ Converted existing user to Barangay user: barangay@barangay.com');
-        console.log('   Password: barangay123');
-        console.log('   Role: barangay_user');
+        // Converted existing user to Barangay user
       } else {
         // Create new Barangay user
         dbWrapper.prepare(`
@@ -476,9 +481,7 @@ async function seedUsers() {
           VALUES (?, ?, ?, ?, ?, ?)
         `).run(barangayUserId, barangayEmail, barangayPasswordHash, 'Barangay User', 'barangay_user', now);
         
-        console.log('✅ Seeded Barangay user: barangay@barangay.com');
-        console.log('   Password: barangay123');
-        console.log('   Role: barangay_user');
+        // Barangay user seeded
       }
     }
     
@@ -494,9 +497,7 @@ async function seedUsers() {
       // Encoder user exists, ensure role is correct
       if (encoderUser.role !== 'encoder') {
         dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('encoder', encoderEmail);
-        console.log('✅ Updated existing Encoder user role');
-      } else {
-        console.log('ℹ️  Encoder user already exists');
+        // Encoder user role updated
       }
     } else {
       // Create new Encoder user
@@ -505,9 +506,7 @@ async function seedUsers() {
         VALUES (?, ?, ?, ?, ?, ?)
       `).run(encoderUserId, encoderEmail, encoderPasswordHash, 'Encoder User', 'encoder', now);
       
-      console.log('✅ Seeded Encoder user: encoder@encoder.com');
-      console.log('   Password: encoder123');
-      console.log('   Role: encoder');
+      // Encoder user seeded
     }
   } catch (error) {
     console.error('❌ Error seeding users:', error?.message || String(error));
@@ -515,17 +514,57 @@ async function seedUsers() {
   }
 }
 
-// Save database to file
+// Batched database save to reduce I/O operations
+let saveTimeout = null;
+let pendingSave = false;
+const SAVE_DEBOUNCE_MS = 1000; // Save at most once per second
+
 function saveDatabase() {
-  if (db) {
-    try {
-      const data = db.export();
-      const buffer = Buffer.from(data);
-      fs.ensureDirSync(dirname(dbPath));
-      fs.writeFileSync(dbPath, buffer);
-    } catch (error) {
-      console.error('Error saving database:', error);
+  if (!db) return;
+  
+  // Mark that a save is pending
+  pendingSave = true;
+  
+  // Clear existing timeout
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+  }
+  
+  // Schedule save after debounce period
+  saveTimeout = setTimeout(() => {
+    if (pendingSave && db) {
+      try {
+        const data = db.export();
+        const buffer = Buffer.from(data);
+        fs.ensureDirSync(dirname(dbPath));
+        fs.writeFileSync(dbPath, buffer);
+        pendingSave = false;
+      } catch (error) {
+        console.error('Error saving database:', error);
+        pendingSave = false;
+      }
     }
+  }, SAVE_DEBOUNCE_MS);
+}
+
+// Force immediate save (for critical operations)
+function saveDatabaseImmediate() {
+  if (!db) return;
+  
+  // Clear any pending debounced save
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+  
+  try {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.ensureDirSync(dirname(dbPath));
+    fs.writeFileSync(dbPath, buffer);
+    pendingSave = false;
+  } catch (error) {
+    console.error('Error saving database:', error);
   }
 }
 
@@ -605,13 +644,18 @@ const dbWrapper = {
   close: () => {
     if (db) {
       try {
-        saveDatabase();
+        // Force immediate save on close
+        saveDatabaseImmediate();
         // sql.js doesn't have an explicit close, but we can save the database
         console.log('Database saved and closed');
       } catch (error) {
         console.error('Error closing database:', error);
       }
     }
+  },
+  // Force immediate save (for critical operations)
+  saveImmediate: () => {
+    saveDatabaseImmediate();
   }
 };
 

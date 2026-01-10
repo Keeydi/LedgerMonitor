@@ -18,7 +18,7 @@ function getStatements() {
 // GET all notifications
 router.get('/', (req, res) => {
   try {
-    const { unread } = req.query;
+    const { unread, limit } = req.query;
     const statements = getStatements();
     
     let notifications;
@@ -27,6 +27,10 @@ router.get('/', (req, res) => {
     } else {
       notifications = statements.getAll.all();
     }
+    
+    // Apply pagination limit (default 100, max 500)
+    const maxLimit = Math.min(parseInt(limit) || 100, 500);
+    notifications = notifications.slice(0, maxLimit);
     
     res.json(notifications.map(notif => ({
       ...notif,

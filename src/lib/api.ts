@@ -226,6 +226,7 @@ export const capturesAPI = {
   trigger: (cameraId: string, imageData?: string) => fetchAPI(`/captures/${cameraId}`, {
     method: 'POST',
     body: JSON.stringify({ imageData }),
+    timeout: 120000, // 120 seconds timeout for AI processing (can take up to 90 seconds)
   }),
   triggerAll: () => fetchAPI('/captures', {
     method: 'POST',
