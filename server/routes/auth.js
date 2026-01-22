@@ -28,8 +28,6 @@ function verifyToken(token) {
 // POST /api/auth/login
 router.post('/login', (req, res) => {
   try {
-    console.log('POST /api/auth/login - Request body:', JSON.stringify({ email: req.body.email, password: '***' }));
-    
     const { email, password } = req.body;
     
     if (!email || !password) {
@@ -43,10 +41,8 @@ router.post('/login', (req, res) => {
     let user;
     try {
       user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
-      console.log('User lookup result:', user ? { id: user.id, email: user.email } : 'not found');
     } catch (dbError) {
       console.error('Database error in login:', dbError);
-      console.error('Error stack:', dbError?.stack);
       return res.status(500).json({ 
         error: 'Database error',
         details: dbError?.message || String(dbError)
@@ -54,23 +50,16 @@ router.post('/login', (req, res) => {
     }
     
     if (!user) {
-      console.log('User not found for email:', email);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
     // Verify password
-    console.log('Comparing passwords - stored:', user.password?.substring(0, 20) + '...', 'provided:', passwordHash.substring(0, 20) + '...');
     if (user.password !== passwordHash) {
-      console.log('Password mismatch for user:', user.email);
-      console.log('Stored hash:', user.password);
-      console.log('Provided hash:', passwordHash);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     
     // Generate token
     const token = generateToken(user.id);
-    
-    console.log('Login successful for user:', user.email);
     
     // Return user data (without password)
     res.json({
@@ -84,7 +73,6 @@ router.post('/login', (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    console.error('Error stack:', error?.stack);
     res.status(500).json({ 
       error: 'Failed to login',
       details: error?.message || String(error)

@@ -417,102 +417,6 @@ async function initDatabase() {
   // Database initialized
 }
 
-// Seed users function - called after database initialization
-async function seedUsers() {
-  try {
-    const crypto = await import('crypto');
-    const now = new Date().toISOString();
-    
-    // Seed Admin user
-    const adminEmail = 'admin@admin.com';
-    const adminPassword = 'admin123!';
-    const adminPasswordHash = crypto.createHash('sha256').update(adminPassword).digest('hex');
-    const adminUserId = 'USER-ADMIN-001';
-    
-    const adminUser = dbWrapper.prepare('SELECT * FROM users WHERE email = ?').get(adminEmail);
-    
-    if (adminUser) {
-      // Admin user exists, ensure role is correct
-      if (adminUser.role !== 'admin') {
-        dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('admin', adminEmail);
-        // Admin user role updated
-      }
-    } else {
-      // Create new Admin user
-      dbWrapper.prepare(`
-        INSERT INTO users (id, email, password, name, role, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(adminUserId, adminEmail, adminPasswordHash, 'Admin User', 'admin', now);
-      
-      // Admin user seeded
-    }
-    
-    // Seed Barangay user
-    const barangayEmail = 'barangay@barangay.com';
-    const barangayPassword = 'barangay123';
-    const barangayPasswordHash = crypto.createHash('sha256').update(barangayPassword).digest('hex');
-    const barangayUserId = 'USER-001';
-    
-    const barangayUser = dbWrapper.prepare('SELECT * FROM users WHERE email = ?').get(barangayEmail);
-    
-    if (barangayUser) {
-      // Barangay user exists, ensure role is correct
-      if (barangayUser.role !== 'barangay_user') {
-        dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('barangay_user', barangayEmail);
-        // Barangay user role updated
-      }
-    } else {
-      // Check if USER-001 exists (might be old admin user)
-      const existingUser = dbWrapper.prepare('SELECT * FROM users WHERE id = ?').get(barangayUserId);
-      
-      if (existingUser && existingUser.email !== adminEmail) {
-        // USER-001 exists but with different email, update it to Barangay user
-        dbWrapper.prepare(`
-          UPDATE users 
-          SET email = ?, password = ?, name = ?, role = ?
-          WHERE id = ?
-        `).run(barangayEmail, barangayPasswordHash, 'Barangay User', 'barangay_user', barangayUserId);
-        
-        // Converted existing user to Barangay user
-      } else {
-        // Create new Barangay user
-        dbWrapper.prepare(`
-          INSERT INTO users (id, email, password, name, role, createdAt)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `).run(barangayUserId, barangayEmail, barangayPasswordHash, 'Barangay User', 'barangay_user', now);
-        
-        // Barangay user seeded
-      }
-    }
-    
-    // Seed Encoder user
-    const encoderEmail = 'encoder@encoder.com';
-    const encoderPassword = 'encoder123';
-    const encoderPasswordHash = crypto.createHash('sha256').update(encoderPassword).digest('hex');
-    const encoderUserId = 'USER-ENCODER-001';
-    
-    const encoderUser = dbWrapper.prepare('SELECT * FROM users WHERE email = ?').get(encoderEmail);
-    
-    if (encoderUser) {
-      // Encoder user exists, ensure role is correct
-      if (encoderUser.role !== 'encoder') {
-        dbWrapper.prepare('UPDATE users SET role = ? WHERE email = ?').run('encoder', encoderEmail);
-        // Encoder user role updated
-      }
-    } else {
-      // Create new Encoder user
-      dbWrapper.prepare(`
-        INSERT INTO users (id, email, password, name, role, createdAt)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(encoderUserId, encoderEmail, encoderPasswordHash, 'Encoder User', 'encoder', now);
-      
-      // Encoder user seeded
-    }
-  } catch (error) {
-    console.error('❌ Error seeding users:', error?.message || String(error));
-    console.error('   Stack:', error?.stack);
-  }
-}
 
 // Batched database save to reduce I/O operations
 let saveTimeout = null;
@@ -661,11 +565,6 @@ const dbWrapper = {
 
 // Initialize and export
 await initDatabase();
-
-// Seed users after database and wrapper are initialized
-seedUsers().catch(err => {
-  console.error('Error seeding users:', err);
-});
 
 export default dbWrapper;
 

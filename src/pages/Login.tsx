@@ -74,7 +74,7 @@ export default function Login() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="barangay@barangay.com"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-9"
@@ -122,13 +122,6 @@ export default function Login() {
               )}
             </Button>
           </form>
-
-          {/* Demo Credentials Hint */}
-          <div className="mt-6 pt-6 border-t border-border">
-            <p className="text-xs text-muted-foreground text-center">
-              Demo credentials: barangay@barangay.com / barangay123
-            </p>
-          </div>
         </div>
 
         {/* Footer */}
