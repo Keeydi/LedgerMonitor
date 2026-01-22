@@ -1,10 +1,8 @@
 import express from 'express';
 import db from '../database.js';
-import { normalizePhoneNumber } from '../utils/phoneUtils.js';
 
 const router = express.Router();
 
-// GET all hosts
 router.get('/', (req, res) => {
   try {
     const { search } = req.query;
@@ -29,7 +27,6 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET host by ID
 router.get('/:id', (req, res) => {
   try {
     const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(req.params.id);
@@ -45,7 +42,6 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// POST create new host
 router.post('/', (req, res) => {
   try {
     const { id, name, contactNumber, address } = req.body;
@@ -56,19 +52,20 @@ router.post('/', (req, res) => {
 
     const createdAt = new Date().toISOString();
     
-    // Normalize contact number to 63XXXXXXXXX format (international) for consistent storage
-    const normalizedContact = normalizePhoneNumber(contactNumber);
-    if (!normalizedContact) {
+    // Store contact number exactly as input - NO CONVERSION
+    // Only remove spaces, dashes, and parentheses for clean storage
+    const cleanedContact = contactNumber.trim().replace(/[\s\-\(\)]/g, '');
+    
+    if (!cleanedContact || cleanedContact.length === 0) {
       return res.status(400).json({ 
-        error: 'Invalid contact number format',
-        details: 'Contact number must be in format: 63XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX, or 09XXXXXXXXX (will be converted to 63XXXXXXXXX)'
+        error: 'Contact number is required'
       });
     }
     
     db.prepare(`
       INSERT INTO hosts (id, name, contactNumber, address, createdAt)
       VALUES (?, ?, ?, ?, ?)
-    `).run(id, name, normalizedContact, address || null, createdAt);
+    `).run(id, name, cleanedContact, address || null, createdAt);
 
     const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(id);
     res.status(201).json({
@@ -94,14 +91,14 @@ router.put('/:id', (req, res) => {
       return res.status(404).json({ error: 'Host not found' });
     }
 
-    // Normalize contact number if it's being updated
-    let normalizedContact = contactNumber !== undefined ? contactNumber : host.contactNumber;
+    // Store contact number exactly as input - NO CONVERSION
+    // Only remove spaces, dashes, and parentheses for clean storage
+    let cleanedContact = host.contactNumber;
     if (contactNumber !== undefined) {
-      normalizedContact = normalizePhoneNumber(contactNumber);
-      if (!normalizedContact) {
+      cleanedContact = contactNumber.trim().replace(/[\s\-\(\)]/g, '');
+      if (!cleanedContact || cleanedContact.length === 0) {
         return res.status(400).json({ 
-          error: 'Invalid contact number format',
-          details: 'Contact number must be in format: 09XXXXXXXXX, +639XXXXXXXXX, or 639XXXXXXXXX'
+          error: 'Contact number cannot be empty'
         });
       }
     }
@@ -112,7 +109,7 @@ router.put('/:id', (req, res) => {
       WHERE id = ?
     `).run(
       name || host.name,
-      normalizedContact,
+      cleanedContact,
       address !== undefined ? address : host.address,
       req.params.id
     );
@@ -127,7 +124,6 @@ router.put('/:id', (req, res) => {
   }
 });
 
-// DELETE host
 router.delete('/:id', (req, res) => {
   try {
     const host = db.prepare('SELECT * FROM hosts WHERE id = ?').get(req.params.id);

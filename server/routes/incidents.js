@@ -3,7 +3,6 @@ import db from '../database.js';
 
 const router = express.Router();
 
-// Prepare statements fresh each time to avoid "Statement closed" errors with sql.js
 function getStatements() {
   return {
     getAll: db.prepare('SELECT * FROM incidents ORDER BY timestamp DESC'),

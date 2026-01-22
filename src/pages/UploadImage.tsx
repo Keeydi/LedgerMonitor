@@ -368,14 +368,14 @@ export default function UploadImage() {
 
                 <div className="space-y-2 pt-4 border-t">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">SMS Sent to Owner</span>
+                    <span className="text-sm text-muted-foreground">Viber Sent to Owner</span>
                     {uploadResult.results.smsSent ? (
                       <Badge variant="success">
                         <CheckCircle className="h-3 w-3 mr-1" />
-                        Sent
+                        Notified
                       </Badge>
                     ) : (
-                      <Badge variant="secondary">Not Sent</Badge>
+                      <Badge variant="secondary">Not Notified</Badge>
                     )}
                   </div>
                   <div className="flex items-center justify-between">

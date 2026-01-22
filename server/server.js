@@ -1,12 +1,9 @@
-// Load environment variables from .env file FIRST
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load .env file from server directory
 const envPath = path.join(__dirname, '.env');
 const envResult = dotenv.config({ path: envPath, debug: false });
 
@@ -37,29 +34,23 @@ import cleanupService from './cleanup_service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Verify critical environment variables
 if (!process.env.GEMINI_API_KEY) {
   console.warn('⚠️  GEMINI_API_KEY not set - using fallback');
 }
 
-// Check SMS service configuration
-if (!process.env.PHILSMS_API_TOKEN && !process.env.PHILSMS_TOKEN) {
-  console.warn('⚠️  PHILSMS_API_TOKEN not set - SMS notifications will not be sent');
-  console.warn('   To enable SMS: Add PHILSMS_API_TOKEN to your .env file in the server directory');
+if (!process.env.INFOBIP_API_KEY) {
+  console.warn('⚠️  INFOBIP_API_KEY not set - using default API key');
+  console.warn('   To use a custom API key: Add INFOBIP_API_KEY to your .env file in the server directory');
 } else {
-  console.log('✅ SMS service configured - PHILSMS_API_TOKEN found');
+  console.log('✅ Viber service configured - INFOBIP_API_KEY found');
 }
 
-// Trust proxy to get accurate client IP addresses
 app.set('trust proxy', true);
 
-// Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Request timeout middleware (30 seconds)
 app.use((req, res, next) => {
   req.setTimeout(30000, () => {
     if (!res.headersSent) {
@@ -69,7 +60,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   if (!res.headersSent) {
@@ -80,10 +70,8 @@ app.use((err, req, res, next) => {
   }
 });
 
-// Serve captured images
 app.use('/captured_images', express.static(path.join(__dirname, 'captured_images')));
 
-// Routes (audit logging applied in individual route files where needed)
 app.use('/api/auth', authRouter);
 app.use('/api/cameras', camerasRouter);
 app.use('/api/vehicles', vehiclesRouter);
@@ -98,7 +86,6 @@ app.use('/api/users', usersRouter);
 app.use('/api/audit-logs', auditLogsRouter);
 app.use('/api/hosts', hostsRouter);
 
-// Start server with port conflict handling
 function startServer(port, isRetry = false) {
   const server = app.listen(port, () => {
     console.log(`🚀 Server running on http://localhost:${port}`);
@@ -112,7 +99,6 @@ function startServer(port, isRetry = false) {
     if (err.code === 'EADDRINUSE') {
       console.log(`⚠️  Port ${port} is in use, trying another one...`);
       const nextPort = port + 1;
-      // Limit to 10 retries to avoid infinite loop
       if (nextPort <= port + 10) {
         startServer(nextPort, true);
       } else {
@@ -129,13 +115,10 @@ function startServer(port, isRetry = false) {
 
 startServer(PORT);
 
-// Start monitoring service
 monitoringService.start();
 
-// Start cleanup service
 cleanupService.start();
 
-// Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Shutting down...');
   

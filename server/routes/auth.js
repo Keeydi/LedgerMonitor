@@ -4,7 +4,6 @@ import crypto from 'crypto';
 
 const router = express.Router();
 
-// Simple JWT-like token generation (for demo purposes)
 function generateToken(userId) {
   const payload = {
     userId,

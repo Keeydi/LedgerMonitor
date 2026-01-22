@@ -27,7 +27,7 @@ except ImportError as e:
 
 # Gemini API Configuration
 # Use environment variable for API key, fallback to default if not set
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyDqQopiY8lP3Rc27N736R3Md3n8SBhJc1E')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyD8nAPVUIUnNABP7mjHU9HDTnSk0rh1ZBI')
 # Use gemini-2.5-flash as requested
 GEMINI_MODEL = 'gemini-2.5-flash'
 CONFIDENCE_THRESHOLD = 0.7  # 70% minimum confidence (lowered for better consistency with stationary vehicles)
@@ -104,7 +104,7 @@ def analyze_image_with_gemini(image: Image.Image) -> Dict:
 CONTEXT:
 - This camera monitors streets and roadways for illegal parking violations
 - Your task is to detect ALL illegally parked vehicles and extract their license plates
-- The system will automatically send SMS warnings to registered vehicle owners or notify Barangay officials
+- The system will automatically send SMS warnings to registered vehicle owners via Semaphore or notify Barangay officials
 
 ILLEGAL PARKING SCENARIOS TO DETECT:
 
@@ -228,7 +228,7 @@ CRITICAL ACCURACY RULES:
 - For plate numbers: If not 100% certain, use "NONE" - accuracy is critical
 - Double-check plate numbers - wrong plates cause wrong SMS recipients
 - Return empty vehicles array ONLY if you are certain there are no vehicles (not just low confidence)
-- Remember: System automatically handles SMS to owners (if registered) or notifies Barangay (if plate not visible/not registered)
+- Remember: System automatically handles SMS to owners via Semaphore (if registered) or notifies Barangay (if plate not visible/not registered)
 - Output ONLY the JSON object, nothing else"""
 
     try:

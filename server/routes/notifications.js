@@ -3,7 +3,6 @@ import db from '../database.js';
 
 const router = express.Router();
 
-// Prepare statements fresh each time to avoid "Statement closed" errors with sql.js
 function getStatements() {
   return {
     getAll: db.prepare('SELECT * FROM notifications ORDER BY timestamp DESC'),
@@ -15,7 +14,6 @@ function getStatements() {
   };
 }
 
-// GET all notifications
 router.get('/', (req, res) => {
   try {
     const { unread, limit } = req.query;
@@ -43,7 +41,6 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET notification by ID
 router.get('/:id', (req, res) => {
   try {
     const statements = getStatements();
@@ -64,7 +61,6 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// PUT mark notification as read
 router.put('/:id/read', (req, res) => {
   try {
     const statements = getStatements();
@@ -87,7 +83,6 @@ router.put('/:id/read', (req, res) => {
   }
 });
 
-// PUT mark all notifications as read
 router.put('/read-all', (req, res) => {
   try {
     const statements = getStatements();
@@ -99,7 +94,6 @@ router.put('/read-all', (req, res) => {
   }
 });
 
-// DELETE notification
 router.delete('/:id', (req, res) => {
   try {
     const statements = getStatements();
@@ -116,7 +110,6 @@ router.delete('/:id', (req, res) => {
   }
 });
 
-// GET notification preferences for user
 router.get('/preferences/:userId', (req, res) => {
   try {
     const preferences = db.prepare('SELECT * FROM notification_preferences WHERE userId = ?').get(req.params.userId);
@@ -145,7 +138,6 @@ router.get('/preferences/:userId', (req, res) => {
   }
 });
 
-// PUT update notification preferences
 router.put('/preferences/:userId', (req, res) => {
   try {
     const { plate_not_visible, warning_expired, vehicle_detected, incident_created } = req.body;

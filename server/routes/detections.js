@@ -3,7 +3,6 @@ import db from '../database.js';
 
 const router = express.Router();
 
-// Prepare statements fresh each time to avoid "Statement closed" errors with sql.js
 function getStatements() {
   return {
     getByCamera: db.prepare(`
@@ -21,8 +20,6 @@ function getStatements() {
   };
 }
 
-// GET all detections for a camera
-// Optional query parameters: minConfidence (default: 0.0, recommended: 0.8 for ≥80% threshold), limit (default: 100, max: 500)
 router.get('/camera/:cameraId', (req, res) => {
   try {
     const statements = getStatements();
@@ -63,7 +60,6 @@ router.get('/camera/:cameraId', (req, res) => {
   }
 });
 
-// GET latest detection for a camera
 router.get('/camera/:cameraId/latest', (req, res) => {
   try {
     const statements = getStatements();
@@ -96,7 +92,6 @@ router.get('/camera/:cameraId/latest', (req, res) => {
   }
 });
 
-// GET all detections (for debugging)
 router.get('/all', (req, res) => {
   try {
     const statements = getStatements();

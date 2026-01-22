@@ -6,8 +6,6 @@ import { getClientIP } from '../utils/ipUtils.js';
 
 const router = express.Router();
 
-// POST /api/audit-logs/log - Log a frontend activity (page view, button click, etc.)
-// This must come BEFORE the auditLog middleware to avoid circular logging
 router.post('/log', authenticateToken, (req, res) => {
   try {
     const { action, resource, resourceId, details } = req.body;
@@ -52,7 +50,6 @@ router.post('/log', authenticateToken, (req, res) => {
 router.use(authenticateToken);
 router.use(auditLog);
 
-// GET /api/audit-logs - Get audit logs (admin only)
 router.get('/', requireRole('admin'), (req, res) => {
   try {
     const { 
@@ -129,7 +126,6 @@ router.get('/', requireRole('admin'), (req, res) => {
   }
 });
 
-// DELETE /api/audit-logs - Clear all audit logs (admin only)
 router.delete('/', requireRole('admin'), (req, res) => {
   try {
     const deleted = db.prepare('DELETE FROM audit_logs').run();
@@ -145,7 +141,6 @@ router.delete('/', requireRole('admin'), (req, res) => {
   }
 });
 
-// GET /api/audit-logs/stats - Get audit log statistics (admin only)
 router.get('/stats', requireRole('admin'), (req, res) => {
   try {
     const { startDate, endDate } = req.query;

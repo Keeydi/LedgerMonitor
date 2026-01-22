@@ -11,22 +11,17 @@ import { shouldCreateNotification } from './notifications.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Use parent directory to match server static file serving path
 const CAPTURED_IMAGES_DIR = path.join(__dirname, '..', 'captured_images');
 
-// Ensure captured_images directory exists
 async function ensureCapturedImagesDir() {
   if (!existsSync(CAPTURED_IMAGES_DIR)) {
     await mkdir(CAPTURED_IMAGES_DIR, { recursive: true });
   }
 }
 
-// Initialize directory on module load
 ensureCapturedImagesDir().catch(console.error);
 
 const router = express.Router();
-
-// Prepare statements fresh each time to avoid "Statement closed" errors with sql.js
 function getStatements() {
   return {
     getCamera: db.prepare('SELECT * FROM cameras WHERE id = ?'),
@@ -47,7 +42,6 @@ function getStatements() {
   };
 }
 
-// POST trigger manual capture for a specific camera
 router.post('/:cameraId', async (req, res) => {
   try {
     await ensureCapturedImagesDir();
@@ -269,13 +263,13 @@ router.post('/:cameraId', async (req, res) => {
               violationsCreated.push(violation.id);
               console.log(`✅ Violation created: ${violation.id} for plate ${detection.plateNumber}`);
               
-              // Check if SMS was actually sent (from violation object)
-              if (violation.smsSent) {
-                console.log(`✅ SMS sent successfully to owner for plate ${detection.plateNumber}`);
+              // Check if Viber message was actually sent (from violation object)
+              if (violation.messageSent) {
+                console.log(`✅ Viber message sent successfully to owner for plate ${detection.plateNumber}`);
               } else {
-                console.log(`⚠️  Violation created but SMS was NOT sent for plate ${detection.plateNumber}`);
-                console.log(`   SMS Status: ${violation.smsSent ? 'sent' : 'not sent'}`);
-                console.log(`   SMS Log ID: ${violation.smsLogId || 'N/A'}`);
+                console.log(`⚠️  Violation created but Viber message was NOT sent for plate ${detection.plateNumber}`);
+                console.log(`   Message Status: ${violation.messageSent ? 'sent' : 'not sent'}`);
+                console.log(`   Message Log ID: ${violation.messageLogId || 'N/A'}`);
               }
               
               // ALWAYS notify authorities when a registered vehicle is detected
@@ -285,7 +279,7 @@ router.post('/:cameraId', async (req, res) => {
               if (userId) {
                 const notificationId = `NOTIF-${Date.now()}-${violation.id}`;
                 const notificationTitle = 'Illegal Parking Violation Detected';
-                const notificationMessage = `Vehicle with plate ${detection.plateNumber} detected illegally parked at ${locationId}. ${violation.smsSent ? 'SMS sent to owner.' : 'SMS could not be sent to owner.'} Barangay attention may be required.`;
+                const notificationMessage = `Vehicle with plate ${detection.plateNumber} detected illegally parked at ${locationId}. ${violation.messageSent ? 'Viber message sent to owner.' : 'Viber message could not be sent to owner.'} Barangay attention may be required.`;
                 
                 try {
                   statements.createNotification.run(

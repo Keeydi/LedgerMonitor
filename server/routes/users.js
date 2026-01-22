@@ -6,11 +6,8 @@ import { auditLog } from '../middleware/audit.js';
 
 const router = express.Router();
 
-// All routes require authentication and audit logging
 router.use(authenticateToken);
 router.use(auditLog);
-
-// GET /api/users - Get all users (admin only)
 router.get('/', requireRole('admin'), (req, res) => {
   try {
     const users = db.prepare(`
@@ -26,7 +23,6 @@ router.get('/', requireRole('admin'), (req, res) => {
   }
 });
 
-// GET /api/users/:id - Get user by ID (admin only)
 router.get('/:id', requireRole('admin'), (req, res) => {
   try {
     const user = db.prepare(`
@@ -46,7 +42,6 @@ router.get('/:id', requireRole('admin'), (req, res) => {
   }
 });
 
-// POST /api/users - Create new user (admin only)
 router.post('/', requireRole('admin'), (req, res) => {
   try {
     const { email, password, name, role } = req.body;
@@ -98,7 +93,6 @@ router.post('/', requireRole('admin'), (req, res) => {
   }
 });
 
-// PUT /api/users/:id - Update user (admin only)
 router.put('/:id', requireRole('admin'), (req, res) => {
   try {
     const { email, password, name, role } = req.body;
@@ -175,7 +169,6 @@ router.put('/:id', requireRole('admin'), (req, res) => {
   }
 });
 
-// DELETE /api/users/:id - Delete user (admin only)
 router.delete('/:id', requireRole('admin'), (req, res) => {
   try {
     const userId = req.params.id;

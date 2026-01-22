@@ -3,13 +3,12 @@ import db from '../database.js';
 import { analyzeImageWithAI } from '../ai_detection_service.js';
 import monitoringService from '../monitoring_service.js';
 import cleanupService from '../cleanup_service.js';
-import { getSMSServiceStatus } from '../utils/smsService.js';
+import { getViberServiceStatus } from '../utils/viberService.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs-extra';
 import { spawn } from 'child_process';
 
-// Helper to read .env file and extract values
 function readEnvFile() {
   const envPath = join(__dirname, '..', '.env');
   const env = {};
@@ -39,7 +38,6 @@ const __dirname = dirname(__filename);
 
 const router = express.Router();
 
-// Check database health
 async function checkDatabase() {
   try {
     // Check if database is accessible by querying tables
@@ -86,7 +84,6 @@ async function checkDatabase() {
   }
 }
 
-// Check AI service health
 async function checkAIService() {
   try {
     const AI_SERVICE_PATH = join(__dirname, '..', 'ai_service.py');
@@ -111,21 +108,19 @@ async function checkAIService() {
       testProcess.on('close', (code) => {
         pythonAvailable = code === 0;
         
-        // Check for Gemini API key - check env vars first, then .env file, then hardcoded fallback
         const envVars = readEnvFile();
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || envVars.GEMINI_API_KEY || envVars.GOOGLE_API_KEY;
-        // AI service has a hardcoded fallback, so it's always configured
-        const hasApiKey = !!apiKey || true; // Always true because of hardcoded fallback in ai_service.py
+        const hasApiKey = !!apiKey || true;
         
         resolve({
           status: pythonAvailable ? 'healthy' : 'degraded',
           available: pythonAvailable,
           serviceFile: pythonExists,
-          apiKeyConfigured: true, // Always true due to hardcoded fallback
+          apiKeyConfigured: true,
           apiKeySource: apiKey ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'environment' : 'env_file') : 'hardcoded_fallback',
           pythonCommand: pythonCmd,
           message: pythonAvailable 
-            ? 'AI service is ready (using hardcoded fallback API key)' 
+            ? 'AI service is ready' 
             : 'Python not available'
         });
       });
@@ -137,14 +132,13 @@ async function checkAIService() {
           status: 'unhealthy',
           available: false,
           serviceFile: pythonExists,
-          apiKeyConfigured: true, // Always true due to hardcoded fallback
+          apiKeyConfigured: true,
           apiKeySource: apiKey ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'environment' : 'env_file') : 'hardcoded_fallback',
           message: 'Python not available',
           error: 'Python command not found'
         });
       });
       
-      // Timeout after 5 seconds
       setTimeout(() => {
         testProcess.kill();
         resolve({
@@ -165,7 +159,6 @@ async function checkAIService() {
   }
 }
 
-// Check monitoring services
 function checkMonitoringServices() {
   return {
     monitoring: {
@@ -185,22 +178,9 @@ function checkMonitoringServices() {
         ? 'Cleanup service is running (deletes empty detections older than 24 hours)' 
         : 'Cleanup service is not running'
     },
-    smsRetry: {
-      status: 'healthy',
-      running: false,
-      interval: 'Not implemented',
-      message: 'SMS retry service not yet implemented'
-    },
-    smsPolling: {
-      status: 'healthy',
-      enabled: false,
-      interval: 'Not implemented',
-      message: 'SMS polling service not yet implemented'
-    }
   };
 }
 
-// Check system info
 function checkSystemInfo() {
   return {
     nodeVersion: process.version,
@@ -215,12 +195,10 @@ function checkSystemInfo() {
   };
 }
 
-// Legacy health check (backward compatibility)
 router.get('/', (req, res) => {
   res.json({ status: 'ok', database: 'connected' });
 });
 
-// Manual cleanup trigger endpoint
 router.post('/cleanup', async (req, res) => {
   try {
     await cleanupService.runCleanup();
@@ -237,7 +215,6 @@ router.post('/cleanup', async (req, res) => {
   }
 });
 
-// GET /api/health/status - Comprehensive health check
 router.get('/status', async (req, res) => {
   try {
     const [database, aiService, systemInfo] = await Promise.all([
@@ -247,13 +224,12 @@ router.get('/status', async (req, res) => {
     ]);
     
     const monitoringServices = checkMonitoringServices();
-    const smsService = getSMSServiceStatus();
+    const viberService = getViberServiceStatus();
     
-    // Calculate overall status
     const statuses = [
       database.status,
       aiService.status,
-      smsService.status,
+      viberService.status, // Use Viber as primary
       monitoringServices.monitoring.status
     ];
     
@@ -269,7 +245,7 @@ router.get('/status', async (req, res) => {
       services: {
         database,
         ai: aiService,
-        sms: smsService,
+        messaging: viberService,
         monitoring: monitoringServices
       },
       system: systemInfo

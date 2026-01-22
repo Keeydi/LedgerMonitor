@@ -3,7 +3,6 @@ import db from '../database.js';
 
 const router = express.Router();
 
-// GET comprehensive analytics
 router.get('/', async (req, res) => {
   try {
     const { startDate, endDate, locationId } = req.query;

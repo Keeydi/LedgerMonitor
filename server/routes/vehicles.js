@@ -1,14 +1,10 @@
 import express from 'express';
 import db from '../database.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
-import { normalizePhoneNumber } from '../utils/phoneUtils.js';
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(authenticateToken);
-
-// GET all vehicles
 router.get('/', (req, res) => {
   try {
     const { search } = req.query;
@@ -49,7 +45,6 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// POST create new vehicle
 router.post('/', (req, res) => {
   try {
     const { id, plateNumber, ownerName, contactNumber, dataSource, hostId, rented, purposeOfVisit } = req.body;
@@ -75,19 +70,20 @@ router.post('/', (req, res) => {
       }
     }
     
-    // Normalize contact number to 63XXXXXXXXX format (international) for consistent storage
-    const normalizedContact = normalizePhoneNumber(finalContactNumber);
-    if (!normalizedContact) {
+    // Store contact number exactly as input - NO CONVERSION
+    // Only remove spaces, dashes, and parentheses for clean storage
+    const cleanedContact = finalContactNumber.trim().replace(/[\s\-\(\)]/g, '');
+    
+    if (!cleanedContact || cleanedContact.length === 0) {
       return res.status(400).json({ 
-        error: 'Invalid contact number format',
-        details: 'Contact number must be in format: 63XXXXXXXXX, +639XXXXXXXXX, 639XXXXXXXXX, or 09XXXXXXXXX (will be converted to 63XXXXXXXXX)'
+        error: 'Contact number is required'
       });
     }
     
     db.prepare(`
       INSERT INTO vehicles (id, plateNumber, ownerName, contactNumber, registeredAt, dataSource, hostId, rented, purposeOfVisit)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, plateNumber, ownerName, normalizedContact, registeredAt, vehicleDataSource, hostId || null, rented || null, purposeOfVisit);
+    `).run(id, plateNumber, ownerName, cleanedContact, registeredAt, vehicleDataSource, hostId || null, rented || null, purposeOfVisit);
 
     const vehicle = db.prepare('SELECT * FROM vehicles WHERE id = ?').get(id);
     res.status(201).json({
@@ -103,7 +99,6 @@ router.post('/', (req, res) => {
   }
 });
 
-// PUT update vehicle (admin and barangay_user only - encoders cannot update)
 router.put('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
   try {
     const { plateNumber, ownerName, contactNumber, hostId, rented, purposeOfVisit } = req.body;
@@ -122,16 +117,14 @@ router.put('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
       }
     }
 
-    // Normalize contact number if it's being updated
-    let normalizedContact = finalContactNumber;
-    if (contactNumber !== undefined) {
-      normalizedContact = normalizePhoneNumber(finalContactNumber);
-      if (!normalizedContact) {
-        return res.status(400).json({ 
-          error: 'Invalid contact number format',
-          details: 'Contact number must be in format: 09XXXXXXXXX, +639XXXXXXXXX, or 639XXXXXXXXX'
-        });
-      }
+    // Store contact number exactly as input - NO CONVERSION
+    // Only remove spaces, dashes, and parentheses for clean storage
+    const cleanedContact = finalContactNumber.trim().replace(/[\s\-\(\)]/g, '');
+    
+    if (!cleanedContact || cleanedContact.length === 0) {
+      return res.status(400).json({ 
+        error: 'Contact number is required'
+      });
     }
 
     db.prepare(`
@@ -141,7 +134,7 @@ router.put('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
     `).run(
       plateNumber !== undefined ? plateNumber : vehicle.plateNumber,
       ownerName !== undefined ? ownerName : vehicle.ownerName,
-      normalizedContact,
+      cleanedContact,
       hostId !== undefined ? (hostId || null) : vehicle.hostId,
       rented !== undefined ? (rented || null) : vehicle.rented,
       purposeOfVisit !== undefined ? purposeOfVisit : vehicle.purposeOfVisit,
@@ -158,7 +151,6 @@ router.put('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
   }
 });
 
-// DELETE vehicle (admin and barangay_user only - encoders cannot delete)
 router.delete('/:id', requireRole('admin', 'barangay_user'), (req, res) => {
   try {
     const vehicle = db.prepare('SELECT * FROM vehicles WHERE id = ?').get(req.params.id);

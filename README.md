@@ -115,10 +115,19 @@ GEMINI_API_KEY=your_gemini_api_key_here
 PHILSMS_API_TOKEN=your_philsms_api_token_here
 ```
 
-**SMS Configuration:**
+**Viber Business Messages Configuration (Primary):**
+- `INFOBIP_API_KEY`: Your Infobip API key (default: configured)
+- `INFOBIP_BASE_URL`: Your Infobip base URL (default: `api.infobip.com`)
+- `VIBER_SENDER`: Your registered Viber Business Messages sender name (default: `IBSelfServe` - shared sender available in free trial)
+- The Viber Business Messages service will automatically send notifications to vehicle owners when illegal parking is detected
+- Messages are sent only for registered vehicles with valid contact numbers
+- Uses Infobip Viber Business Messages API v2 endpoint (`/viber/2/messages`)
+- Supports messages up to 1,000 characters
+
+**SMS Configuration (Legacy/Backup):**
 - `PHILSMS_API_TOKEN`: Your PhilSMS API token (Bearer token format: `895|H7NndPV0RXF7RUgXRYEbUJXHAqnq7lsydykFXsNT1af7cccb`)
-- The SMS service will automatically send notifications to vehicle owners when illegal parking is detected
-- SMS is sent only for registered vehicles with valid contact numbers
+- `SEMAPHORE_API_KEY`: Your Semaphore SMS API key (alternative SMS provider)
+- SMS service is available as a backup option
 
 ## Production Build
 

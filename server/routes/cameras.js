@@ -4,7 +4,6 @@ import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Prepare statements fresh each time to avoid "Statement closed" errors with sql.js
 function getStatements() {
   return {
     getAll: db.prepare('SELECT * FROM cameras ORDER BY name'),
@@ -22,7 +21,6 @@ function getStatements() {
   };
 }
 
-// GET all cameras
 router.get('/', (req, res) => {
   try {
     const statements = getStatements();
@@ -64,7 +62,6 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET camera by ID
 router.get('/:id', (req, res) => {
   try {
     const statements = getStatements();
@@ -107,7 +104,6 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// POST create new camera (Admin only)
 router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
   try {
     console.log('POST /api/cameras - Request body:', JSON.stringify(req.body, null, 2));
@@ -288,8 +284,6 @@ router.post('/', authenticateToken, requireRole('admin'), (req, res) => {
   }
 });
 
-// PUT update camera
-// PUT update camera (Admin only)
 router.put('/:id', authenticateToken, requireRole('admin'), (req, res) => {
   try {
     const statements = getStatements();

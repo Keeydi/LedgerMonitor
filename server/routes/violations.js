@@ -1,19 +1,11 @@
 import express from 'express';
 import db from '../database.js';
-import { sendViolationSMS } from '../utils/smsService.js';
+import { sendViolationViber } from '../utils/viberService.js';
 
 const router = express.Router();
 
-/**
- * Automatically create a violation from a detection
- * @param {string} plateNumber - Vehicle plate number
- * @param {string} cameraLocationId - Camera location ID
- * @param {string} detectionId - Detection ID (optional, for tracking)
- * @returns {Promise<Object|null>} - Created violation object or null if not created
- */
 export async function createViolationFromDetection(plateNumber, cameraLocationId, detectionId = null) {
   try {
-    // Skip if plate is not visible or is blurry (BLUR means visible but unreadable)
     if (!plateNumber || plateNumber.toUpperCase() === 'NONE' || plateNumber.toUpperCase() === 'BLUR') {
       return null;
     }
@@ -35,8 +27,8 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
 
     let violationId;
     let isExistingViolation = false;
-    let smsSent = false;
-    let smsLogId = null;
+    let messageSent = false;
+    let messageLogId = null;
     
     if (existingViolation) {
       console.log(`ℹ️  Active violation already exists for ${plateNumber} at ${cameraLocationId}`);
@@ -71,18 +63,18 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
         expiresAt
       );
       
-      // Send SMS to vehicle owner (only for new violations)
+      // Send Viber message to vehicle owner (only for new violations)
       try {
-        const smsResult = await sendViolationSMS(plateNumber, cameraLocationId, violationId);
-        if (smsResult.success) {
-          smsSent = true;
-          smsLogId = smsResult.smsLogId;
-          console.log(`✅ SMS sent to owner for plate ${plateNumber} (Log ID: ${smsLogId})`);
+        const viberResult = await sendViolationViber(plateNumber, cameraLocationId, violationId);
+        if (viberResult.success) {
+          messageSent = true;
+          messageLogId = viberResult.messageLogId;
+          console.log(`✅ Viber message sent to owner for plate ${plateNumber} (Log ID: ${messageLogId})`);
         } else {
-          console.log(`⚠️  SMS not sent for plate ${plateNumber}: ${smsResult.error}`);
+          console.log(`⚠️  Viber message not sent for plate ${plateNumber}: ${viberResult.error}`);
         }
-      } catch (smsError) {
-        console.error(`❌ Error sending SMS for plate ${plateNumber}:`, smsError);
+      } catch (viberError) {
+        console.error(`❌ Error sending Viber message for plate ${plateNumber}:`, viberError);
       }
       
       // Create notification for new warning
@@ -92,7 +84,7 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
         
         const warningNotificationId = `NOTIF-WARNING-${violationId}-${Date.now()}`;
         const warningTitle = `New Warning - ${plateNumber}`;
-        const warningMessage = `Illegal parking detected for vehicle ${plateNumber} at ${cameraLocationId}. 30-minute grace period started.${smsSent ? ' SMS sent to owner.' : ' SMS could not be sent to owner.'}`;
+        const warningMessage = `Illegal parking detected for vehicle ${plateNumber} at ${cameraLocationId}. 30-minute grace period started.${messageSent ? ' Viber message sent to owner.' : ' Viber message could not be sent to owner.'}`;
         
         db.prepare(`
           INSERT INTO notifications (
@@ -137,8 +129,8 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
       timeDetected: new Date(violation.timeDetected),
       timeIssued: violation.timeIssued ? new Date(violation.timeIssued) : null,
       warningExpiresAt: violation.warningExpiresAt ? new Date(violation.warningExpiresAt) : null,
-      smsSent: smsSent || false,
-      smsLogId: smsLogId || null
+      messageSent: messageSent || false,
+      messageLogId: messageLogId || null
     };
   } catch (error) {
     console.error(`❌ Error creating automatic violation for ${plateNumber}:`, error);
@@ -146,7 +138,6 @@ export async function createViolationFromDetection(plateNumber, cameraLocationId
   }
 }
 
-// GET all violations with optional filtering
 router.get('/', (req, res) => {
   try {
     const { status, locationId, startDate, endDate, plateNumber } = req.query;
@@ -280,7 +271,6 @@ router.get('/', (req, res) => {
   }
 });
 
-// GET violations statistics
 router.get('/stats', (req, res) => {
   try {
     const { startDate, endDate, locationId } = req.query;
@@ -349,7 +339,6 @@ router.get('/stats', (req, res) => {
   }
 });
 
-// GET violation by ID
 router.get('/:id', (req, res) => {
   try {
     const violation = db.prepare('SELECT * FROM violations WHERE id = ?').get(req.params.id);
@@ -367,7 +356,6 @@ router.get('/:id', (req, res) => {
   }
 });
 
-// POST create new violation
 router.post('/', async (req, res) => {
   try {
     const { id, ticketId, plateNumber, cameraLocationId, status, warningExpiresAt } = req.body;
@@ -426,7 +414,6 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT update violation
 router.put('/:id', (req, res) => {
   try {
     const { status, timeIssued, warningExpiresAt } = req.body;
@@ -459,7 +446,6 @@ router.put('/:id', (req, res) => {
   }
 });
 
-// DELETE violation
 router.delete('/:id', (req, res) => {
   try {
     const violation = db.prepare('SELECT * FROM violations WHERE id = ?').get(req.params.id);

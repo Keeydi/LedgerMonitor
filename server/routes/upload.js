@@ -10,22 +10,17 @@ import { shouldCreateNotification } from './notifications.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Use parent directory to match server static file serving path
 const CAPTURED_IMAGES_DIR = path.join(__dirname, '..', 'captured_images');
 
-// Ensure captured_images directory exists
 async function ensureCapturedImagesDir() {
   if (!existsSync(CAPTURED_IMAGES_DIR)) {
     await mkdir(CAPTURED_IMAGES_DIR, { recursive: true });
   }
 }
 
-// Initialize directory on module load
 ensureCapturedImagesDir().catch(console.error);
 
 const router = express.Router();
-
-// Prepare statements fresh each time to avoid "Statement closed" errors with sql.js
 function getStatements() {
   return {
     createDetection: db.prepare(`
@@ -43,7 +38,6 @@ function getStatements() {
   };
 }
 
-// POST upload and analyze image
 router.post('/analyze', async (req, res) => {
   try {
     await ensureCapturedImagesDir();
@@ -135,7 +129,7 @@ router.post('/analyze', async (req, res) => {
     const notificationsCreated = [];
     const violationsCreated = [];
     const detectedVehicles = []; // Store detected vehicles with owner info
-    let actualSmsSent = false; // Track if SMS was actually sent successfully
+    let actualMessageSent = false; // Track if Viber message was actually sent successfully
     
     for (const detection of detections) {
       try {
@@ -167,7 +161,7 @@ router.post('/analyze', async (req, res) => {
         // Check if it's a real vehicle (not 'none' class)
         const isRealVehicle = detection.class_name && detection.class_name.toLowerCase() !== 'none';
         
-        // Case 1: Real vehicle with visible plate - check database and send SMS
+        // Case 1: Real vehicle with visible plate - check database and send Viber message
         if (isRealVehicle && !plateNotVisible) {
           try {
             // Check if vehicle exists in database
@@ -183,7 +177,7 @@ router.post('/analyze', async (req, res) => {
             });
             
             if (vehicle) {
-              // Vehicle exists - create violation and send SMS
+              // Vehicle exists - create violation and send Viber message
               const violation = await createViolationFromDetection(
                 detection.plateNumber,
                 uploadLocationId,
@@ -191,12 +185,12 @@ router.post('/analyze', async (req, res) => {
               );
               if (violation) {
                 violationsCreated.push(violation.id);
-                // Check if SMS was actually sent (from violation object)
-                if (violation.smsSent) {
-                  actualSmsSent = true;
-                  console.log(`✅ Violation created and SMS sent to owner for plate ${detection.plateNumber}`);
+                // Check if Viber message was actually sent (from violation object)
+                if (violation.messageSent) {
+                  actualMessageSent = true;
+                  console.log(`✅ Violation created and Viber message sent to owner for plate ${detection.plateNumber}`);
                 } else {
-                  console.log(`⚠️  Violation created but SMS was not sent for plate ${detection.plateNumber}`);
+                  console.log(`⚠️  Violation created but Viber message was not sent for plate ${detection.plateNumber}`);
                 }
               }
             } else {
@@ -362,7 +356,7 @@ router.post('/analyze', async (req, res) => {
       results: {
         plateDetected: detections.some(d => d.plateNumber && d.plateNumber !== 'NONE'),
         vehicleDetected: detections.some(d => d.class_name && d.class_name.toLowerCase() !== 'none'),
-        smsSent: actualSmsSent, // Use actual SMS send status, not just violation creation
+        smsSent: actualMessageSent, // Viber message send status (kept as smsSent for frontend compatibility)
         barangayNotified: notificationsCreated.length > 0 || incidentsCreated.length > 0
       }
     });
