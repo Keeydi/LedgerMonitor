@@ -33,10 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (userData) {
             setUser(userData);
           } else {
+            // Token is invalid or expired
             localStorage.removeItem('auth_token');
           }
         }
       } catch (error) {
+        // Silently handle auth errors - user will need to log in again
         localStorage.removeItem('auth_token');
       } finally {
         setIsLoading(false);

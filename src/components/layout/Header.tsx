@@ -18,6 +18,7 @@ import { notificationsAPI } from '@/lib/api';
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  action?: React.ReactNode;
 }
 
 interface Notification {
@@ -39,7 +40,7 @@ interface Notification {
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const SERVER_BASE_URL = API_BASE_URL.replace('/api', '');
 
-export function Header({ title, subtitle }: HeaderProps) {
+export function Header({ title, subtitle, action }: HeaderProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -109,6 +110,11 @@ export function Header({ title, subtitle }: HeaderProps) {
       </div>
       
       <div className="flex items-center gap-2 sm:gap-4">
+        {action && (
+          <div className="hidden sm:block">
+            {action}
+          </div>
+        )}
         <div className="relative hidden sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input 

@@ -32,6 +32,7 @@ interface HealthStatus {
       monitoring: any;
       smsRetry: any;
       smsPolling: any;
+      cleanup?: any;
     };
   };
   system: {
@@ -190,9 +191,9 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
-                <StatusBadge status={healthStatus.services.database.status} />
+                <StatusBadge status={healthStatus.services.database?.status || 'error'} />
               </div>
-              {healthStatus.services.database.connected && (
+              {healthStatus.services.database?.connected && (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Tables</span>
@@ -206,7 +207,7 @@ export default function Settings() {
                       {Object.entries(healthStatus.services.database.tables.counts).map(([table, count]) => (
                         <div key={table} className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground capitalize">{table}</span>
-                          <span className="font-mono">{count}</span>
+                          <span className="font-mono">{count as number}</span>
                         </div>
                       ))}
                     </div>
@@ -230,21 +231,21 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Status</span>
-                <StatusBadge status={healthStatus.services.ai.status} />
+                <StatusBadge status={healthStatus.services.ai?.status || 'error'} />
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Python Available</span>
-                <Badge variant={healthStatus.services.ai.available ? 'default' : 'destructive'}>
-                  {healthStatus.services.ai.available ? 'Yes' : 'No'}
+                <Badge variant={healthStatus.services.ai?.available ? 'default' : 'destructive'}>
+                  {healthStatus.services.ai?.available ? 'Yes' : 'No'}
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">API Key</span>
-                <Badge variant={healthStatus.services.ai.apiKeyConfigured ? 'default' : 'destructive'}>
-                  {healthStatus.services.ai.apiKeyConfigured ? 'Configured' : 'Not Set'}
+                <Badge variant={healthStatus.services.ai?.apiKeyConfigured ? 'default' : 'destructive'}>
+                  {healthStatus.services.ai?.apiKeyConfigured ? 'Configured' : 'Not Set'}
                 </Badge>
               </div>
-              {healthStatus.services.ai.apiKeySource && (
+              {healthStatus.services.ai?.apiKeySource && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">API Key Source</span>
                   <Badge variant="outline" className="text-xs capitalize">
@@ -252,51 +253,14 @@ export default function Settings() {
                   </Badge>
                 </div>
               )}
-              {healthStatus.services.ai.pythonCommand && (
+              {healthStatus.services.ai?.pythonCommand && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Python Command</span>
                   <span className="text-xs font-mono">{healthStatus.services.ai.pythonCommand}</span>
                 </div>
               )}
               <p className="text-xs text-muted-foreground pt-2 border-t">
-                {healthStatus.services.ai.message}
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* SMS Service Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                SMS Service
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Status</span>
-                <StatusBadge status={healthStatus.services.sms.status} />
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Provider</span>
-                <span className="text-sm font-medium">{healthStatus.services.sms.provider}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Configured</span>
-                <Badge variant={healthStatus.services.sms.configured ? 'default' : 'destructive'}>
-                  {healthStatus.services.sms.configured ? 'Yes' : 'No'}
-                </Badge>
-              </div>
-              {healthStatus.services.sms.tokenSource && healthStatus.services.sms.tokenSource !== 'none' && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Token Source</span>
-                  <Badge variant="outline" className="text-xs capitalize">
-                    {healthStatus.services.sms.tokenSource === 'env_file' ? '.env file' : 'Environment variable'}
-                  </Badge>
-                </div>
-              )}
-              <p className="text-xs text-muted-foreground pt-2 border-t">
-                {healthStatus.services.sms.message}
+                {healthStatus.services.ai?.message || 'AI service information not available'}
               </p>
             </CardContent>
           </Card>
@@ -314,58 +278,62 @@ export default function Settings() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Vehicle Monitoring</span>
-                  <StatusBadge status={healthStatus.services.monitoring.monitoring.status} />
+                  <StatusBadge status={healthStatus.services.monitoring?.monitoring?.status || 'error'} />
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground pl-4">
-                  <span>Interval: {healthStatus.services.monitoring.monitoring.interval}</span>
-                  <Badge variant={healthStatus.services.monitoring.monitoring.running ? 'default' : 'destructive'} className="text-xs">
-                    {healthStatus.services.monitoring.monitoring.running ? 'Running' : 'Stopped'}
+                  <span>Interval: {healthStatus.services.monitoring?.monitoring?.interval || 'N/A'}</span>
+                  <Badge variant={healthStatus.services.monitoring?.monitoring?.running ? 'default' : 'destructive'} className="text-xs">
+                    {healthStatus.services.monitoring?.monitoring?.running ? 'Running' : 'Stopped'}
                   </Badge>
                 </div>
 
                 {/* SMS Retry Service */}
-                <div className="pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">SMS Retry</span>
-                    <StatusBadge status={healthStatus.services.monitoring.smsRetry.status} />
+                {healthStatus.services.monitoring?.smsRetry && (
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">SMS Retry</span>
+                      <StatusBadge status={healthStatus.services.monitoring.smsRetry.status || 'error'} />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pl-4">
+                      <span>Interval: {healthStatus.services.monitoring.smsRetry.interval || 'N/A'}</span>
+                      <Badge variant={healthStatus.services.monitoring.smsRetry.running ? 'default' : 'destructive'} className="text-xs">
+                        {healthStatus.services.monitoring.smsRetry.running ? 'Running' : 'Stopped'}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pl-4">
-                    <span>Interval: {healthStatus.services.monitoring.smsRetry.interval}</span>
-                    <Badge variant={healthStatus.services.monitoring.smsRetry.running ? 'default' : 'destructive'} className="text-xs">
-                      {healthStatus.services.monitoring.smsRetry.running ? 'Running' : 'Stopped'}
-                    </Badge>
-                  </div>
-                </div>
+                )}
 
                 {/* SMS Polling Service */}
-                <div className="pt-2 border-t">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">SMS Polling</span>
-                    <StatusBadge status={healthStatus.services.monitoring.smsPolling.status} />
+                {healthStatus.services.monitoring?.smsPolling && (
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">SMS Polling</span>
+                      <StatusBadge status={healthStatus.services.monitoring.smsPolling.status || 'error'} />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground pl-4">
+                      <span>Interval: {healthStatus.services.monitoring.smsPolling.interval || 'N/A'}</span>
+                      <Badge variant={healthStatus.services.monitoring.smsPolling.enabled ? 'default' : 'outline'} className="text-xs">
+                        {healthStatus.services.monitoring.smsPolling.enabled ? 'Enabled' : 'Disabled'}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground pl-4">
-                    <span>Interval: {healthStatus.services.monitoring.smsPolling.interval}</span>
-                    <Badge variant={healthStatus.services.monitoring.smsPolling.enabled ? 'default' : 'outline'} className="text-xs">
-                      {healthStatus.services.monitoring.smsPolling.enabled ? 'Enabled' : 'Disabled'}
-                    </Badge>
-                  </div>
-                </div>
+                )}
 
                 {/* Cleanup Service */}
-                {healthStatus.services.monitoring.cleanup && (
+                {healthStatus.services.monitoring?.cleanup && (
                   <div className="pt-2 border-t">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Cleanup Service</span>
-                      <StatusBadge status={healthStatus.services.monitoring.cleanup.status} />
+                      <StatusBadge status={healthStatus.services.monitoring.cleanup.status || 'error'} />
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground pl-4">
-                      <span>Runs every: {healthStatus.services.monitoring.cleanup.interval}</span>
+                      <span>Runs every: {healthStatus.services.monitoring.cleanup.interval || 'N/A'}</span>
                       <Badge variant={healthStatus.services.monitoring.cleanup.running ? 'default' : 'destructive'} className="text-xs">
                         {healthStatus.services.monitoring.cleanup.running ? 'Running' : 'Stopped'}
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground pl-4 mt-1">
-                      Deletes empty detections older than {healthStatus.services.monitoring.cleanup.retention}
+                      Deletes empty detections older than {healthStatus.services.monitoring.cleanup.retention || 'N/A'}
                     </div>
                   </div>
                 )}

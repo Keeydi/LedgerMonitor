@@ -369,11 +369,16 @@ export const authAPI = {
       });
 
       if (!response.ok) {
+        // If 401, token is invalid/expired - silently fail
+        if (response.status === 401) {
+          return null;
+        }
         return null;
       }
 
       return response.json();
-    } catch {
+    } catch (error) {
+      // Silently handle network errors
       return null;
     }
   },
