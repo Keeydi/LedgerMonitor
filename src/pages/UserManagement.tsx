@@ -52,7 +52,7 @@ export default function UserManagement() {
     email: '',
     password: '',
     name: '',
-    role: 'encoder' as 'encoder',
+    role: 'encoder' as 'admin' | 'barangay_user' | 'encoder',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -107,7 +107,7 @@ export default function UserManagement() {
       email: '',
       password: '',
       name: '',
-      role: 'barangay_user',
+      role: 'encoder',
     });
   };
 
@@ -148,16 +148,17 @@ export default function UserManagement() {
           description: "User updated successfully",
         });
       } else {
-        // Create new user - always encoder role
+        // Create new user - store to database via API
+        const role = formData.role === 'admin' ? 'encoder' : formData.role;
         await usersAPI.create({
           email: formData.email,
           password: formData.password,
           name: formData.name || undefined,
-          role: 'encoder',
+          role,
         });
         toast({
           title: "Success",
-          description: "User created successfully",
+          description: "User added successfully",
         });
       }
       handleCloseDialog();
@@ -308,7 +309,13 @@ export default function UserManagement() {
       </div>
 
       {/* Add/Edit User Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCloseDialog();
+          else setIsDialogOpen(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{selectedUser ? 'Edit User' : 'Add New User'}</DialogTitle>
@@ -353,15 +360,38 @@ export default function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Input
-                id="role"
-                value="Encoder"
-                disabled
-                className="bg-secondary"
-              />
-              <p className="text-xs text-muted-foreground">
-                Only encoders can be created. Encoders can only add new vehicles.
-              </p>
+              {selectedUser ? (
+                <>
+                  <Input
+                    id="role"
+                    value={selectedUser.role === 'admin' ? 'Admin' : selectedUser.role === 'encoder' ? 'Encoder' : 'Barangay User'}
+                    disabled
+                    className="bg-secondary"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Role cannot be changed when editing.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Select
+                    value={formData.role === 'admin' ? 'encoder' : formData.role}
+                    onValueChange={(value: 'encoder' | 'barangay_user') => setFormData({ ...formData, role: value })}
+                    disabled={isSubmitting}
+                  >
+                    <SelectTrigger id="role">
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="encoder">Encoder</SelectItem>
+                      <SelectItem value="barangay_user">Barangay User</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Encoders can add vehicles. Barangay users have access to barangay features.
+                  </p>
+                </>
+              )}
             </div>
           </div>
           <DialogFooter>

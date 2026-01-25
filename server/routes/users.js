@@ -50,8 +50,9 @@ router.post('/', requireRole('admin'), (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
     
-    // Only allow creating encoders - no other roles can be created
-    const userRole = 'encoder';
+    // Allow admin to create encoder or barangay_user (never admin via UI)
+    const allowedRoles = ['encoder', 'barangay_user'];
+    const userRole = role && allowedRoles.includes(role) ? role : 'encoder';
     
     // Check if email already exists
     const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim());
@@ -66,7 +67,7 @@ router.post('/', requireRole('admin'), (req, res) => {
     const userId = `USER-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
     const now = new Date().toISOString();
     
-    // Insert user
+    // Insert user into database
     db.prepare(`
       INSERT INTO users (id, email, password, name, role, createdAt)
       VALUES (?, ?, ?, ?, ?, ?)
@@ -78,6 +79,12 @@ router.post('/', requireRole('admin'), (req, res) => {
       userRole,
       now
     );
+    
+    // Create default notification preferences for new user
+    db.prepare(`
+      INSERT INTO notification_preferences (userId, plate_not_visible, warning_expired, vehicle_detected, incident_created, updatedAt)
+      VALUES (?, 1, 1, 1, 1, ?)
+    `).run(userId, now);
     
     // Return user without password
     const newUser = db.prepare(`
