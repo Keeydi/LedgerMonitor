@@ -73,6 +73,31 @@ export async function analyzeImageWithAI(imageBase64 = null, imagePath = null) {
     // Try python3 first, fallback to python
     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
     
+    // Verify Python version before running
+    await new Promise((resolve) => {
+      const versionCheck = spawn(pythonCmd, ['--version'], { timeout: 5000 });
+      let versionOutput = '';
+      versionCheck.stdout.on('data', (data) => {
+        versionOutput += data.toString();
+      });
+      versionCheck.on('close', (code) => {
+        if (code === 0) {
+          console.log(`🤖 Using Python: ${versionOutput.trim()}`);
+        } else {
+          console.warn(`⚠️  Could not verify Python version. Using: ${pythonCmd}`);
+        }
+        resolve();
+      });
+      versionCheck.on('error', () => {
+        console.warn(`⚠️  Could not verify Python version. Using: ${pythonCmd}`);
+        resolve();
+      });
+      setTimeout(() => {
+        versionCheck.kill();
+        resolve();
+      }, 5000);
+    });
+    
     console.log(`🤖 Starting AI analysis with ${pythonCmd}...`);
     
     // Spawn Python process
@@ -80,8 +105,8 @@ export async function analyzeImageWithAI(imageBase64 = null, imagePath = null) {
       cwd: __dirname,
       env: {
         ...process.env,
-        // Use environment variable if set, otherwise use fallback (matches Python service)
-        GEMINI_API_KEY: process.env.GEMINI_API_KEY || 'AIzaSyD8nAPVUIUnNABP7mjHU9HDTnSk0rh1ZBI',
+        // GEMINI_API_KEY must be set in .env or environment - no hardcoded fallback (each developer uses their own key)
+        ...(process.env.GEMINI_API_KEY && { GEMINI_API_KEY: process.env.GEMINI_API_KEY }),
         PYTHONUNBUFFERED: '1' // Ensure real-time output
       }
     });
@@ -135,10 +160,23 @@ export async function analyzeImageWithAI(imageBase64 = null, imagePath = null) {
 
       if (code !== 0) {
         console.error(`❌ AI Service Error (exit code ${code}):`, stderr);
+        
+        // Provide helpful error message for missing packages
+        let errorMessage = stderr.substring(0, 500);
+        if (stderr.includes('Missing required package') || stderr.includes('ImportError')) {
+          const pythonPath = stderr.match(/Python Executable: (.+)/)?.[1] || pythonCmd;
+          errorMessage = `Missing Python packages. The packages need to be installed in the Python environment that Node.js is using.
+
+Current Python: ${pythonCmd}
+${stderr.includes('Python Executable:') ? '' : `\nTo fix this, run:\n  ${pythonPath} -m pip install google-generativeai pillow\n\nOr if you have multiple Python installations, make sure the packages are installed in the Python that Node.js is calling.`}
+
+Full error: ${stderr.substring(0, 300)}`;
+        }
+        
         // Return empty result instead of rejecting (graceful degradation)
         return resolve({
           vehicles: [],
-          error: `AI service exited with code ${code}: ${stderr.substring(0, 500)}`,
+          error: errorMessage,
           timestamp: new Date().toISOString()
         });
       }
@@ -170,7 +208,7 @@ export async function analyzeImageWithAI(imageBase64 = null, imagePath = null) {
       console.error('❌ Failed to spawn Python process:', error);
       // Check if Python is installed
       if (error.code === 'ENOENT') {
-        console.warn('⚠️  Python3 not found. Install Python 3.8+ to enable AI detection.');
+        console.warn('⚠️  Python3 not found. Install Python 3.9+ to enable AI detection.');
       }
       resolve({
         vehicles: [],

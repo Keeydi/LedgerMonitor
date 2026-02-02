@@ -1,3 +1,4 @@
+# Python 3.9+ required (google-generativeai requires Python 3.9+)
 google-generativeai>=0.3.0
 Pillow>=10.0.0
 

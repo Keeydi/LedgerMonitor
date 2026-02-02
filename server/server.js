@@ -1,16 +1,9 @@
-import dotenv from 'dotenv';
+import './loadEnv.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const envPath = path.join(__dirname, '.env');
-const envResult = dotenv.config({ path: envPath, debug: false });
-
-if (envResult.error) {
-  console.warn(`⚠️  Warning: Could not load .env file from ${envPath}`);
-  console.warn(`   Error: ${envResult.error.message}`);
-}
 
 import express from 'express';
 import cors from 'cors';
@@ -35,14 +28,13 @@ import cleanupService from './cleanup_service.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 if (!process.env.GEMINI_API_KEY) {
-  console.warn('⚠️  GEMINI_API_KEY not set - using fallback');
+  console.warn('⚠️  GEMINI_API_KEY not set - AI features will not work. Add GEMINI_API_KEY to server/.env');
 }
 
-if (!process.env.INFOBIP_API_KEY) {
-  console.warn('⚠️  INFOBIP_API_KEY not set - using default API key');
-  console.warn('   To use a custom API key: Add INFOBIP_API_KEY to your .env file in the server directory');
+if (!process.env.INFOBIP_API_KEY || !process.env.INFOBIP_BASE_URL || !process.env.VIBER_SENDER) {
+  console.warn('⚠️  Viber/Infobip not fully configured - set INFOBIP_API_KEY, INFOBIP_BASE_URL, VIBER_SENDER in server/.env');
 } else {
-  console.log('✅ Viber service configured - INFOBIP_API_KEY found');
+  console.log('✅ Viber service configured from .env');
 }
 
 app.set('trust proxy', true);

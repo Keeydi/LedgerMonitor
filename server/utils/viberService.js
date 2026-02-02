@@ -1,18 +1,22 @@
 import db from '../database.js';
 import { normalizePhoneNumber } from './phoneUtils.js';
 
-const INFOBIP_BASE_URL = process.env.INFOBIP_BASE_URL || 'api.infobip.com';
-const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY || '4c3957d8340aba10e5f48bff2b1f7236-fd58a93c-79b7-4abe-b929-42e2caabdab1';
-const INFOBIP_API_URL = `https://${INFOBIP_BASE_URL}/viber/2/messages`;
-const VIBER_SENDER = process.env.VIBER_SENDER || 'IBSelfServe';
+// All Viber/Infobip config from .env (loadEnv.js must be imported first in server.js)
+const INFOBIP_BASE_URL = process.env.INFOBIP_BASE_URL;
+const INFOBIP_API_KEY = process.env.INFOBIP_API_KEY;
+const INFOBIP_API_URL = INFOBIP_BASE_URL ? `https://${INFOBIP_BASE_URL}/viber/2/messages` : '';
+const VIBER_SENDER = process.env.VIBER_SENDER;
 const MAX_MESSAGE_LENGTH = 1000;
 
 function validateConfig() {
   if (!INFOBIP_API_KEY) {
-    return { valid: false, error: 'INFOBIP_API_KEY not configured in environment' };
+    return { valid: false, error: 'INFOBIP_API_KEY not configured. Add it to server/.env' };
   }
   if (!INFOBIP_BASE_URL) {
-    return { valid: false, error: 'INFOBIP_BASE_URL not configured in environment' };
+    return { valid: false, error: 'INFOBIP_BASE_URL not configured. Add it to server/.env' };
+  }
+  if (!VIBER_SENDER) {
+    return { valid: false, error: 'VIBER_SENDER not configured. Add it to server/.env' };
   }
   return { valid: true };
 }

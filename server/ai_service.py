@@ -22,12 +22,36 @@ try:
     from PIL import Image
     import io
 except ImportError as e:
-    print(f"Error: Missing required package. Install with: pip install google-generativeai pillow", file=sys.stderr)
+    # Provide diagnostic information
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    python_executable = sys.executable
+    missing_package = str(e).split("'")[1] if "'" in str(e) else "unknown"
+    
+    error_msg = f"""Error: Missing required package '{missing_package}'
+
+Python Environment Info:
+  - Python Version: {python_version}
+  - Python Executable: {python_executable}
+  - Python Path: {sys.path[0] if sys.path else 'unknown'}
+
+Solution:
+  1. Make sure you're using the same Python that Node.js is calling
+  2. Install packages using this exact Python:
+     "{python_executable}" -m pip install google-generativeai pillow
+  
+  3. Or if using a virtual environment, activate it first:
+     source venv/bin/activate  # Linux/Mac
+     venv\\Scripts\\activate     # Windows
+     pip install google-generativeai pillow
+
+  4. Verify installation:
+     "{python_executable}" -m pip list | grep -E "(google-generativeai|Pillow)"
+"""
+    print(error_msg, file=sys.stderr)
     sys.exit(1)
 
-# Gemini API Configuration
-# Use environment variable for API key, fallback to default if not set
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', 'AIzaSyD8nAPVUIUnNABP7mjHU9HDTnSk0rh1ZBI')
+# Gemini API Configuration - key must be set in .env or environment (each developer uses their own key)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 # Use gemini-2.5-flash as requested
 GEMINI_MODEL = 'gemini-2.5-flash'
 CONFIDENCE_THRESHOLD = 0.7  # 70% minimum confidence (lowered for better consistency with stationary vehicles)

@@ -110,14 +110,14 @@ async function checkAIService() {
         
         const envVars = readEnvFile();
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || envVars.GEMINI_API_KEY || envVars.GOOGLE_API_KEY;
-        const hasApiKey = !!apiKey || true;
+        const hasApiKey = !!apiKey;
         
         resolve({
           status: pythonAvailable ? 'healthy' : 'degraded',
           available: pythonAvailable,
           serviceFile: pythonExists,
-          apiKeyConfigured: true,
-          apiKeySource: apiKey ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'environment' : 'env_file') : 'hardcoded_fallback',
+          apiKeyConfigured: hasApiKey,
+          apiKeySource: hasApiKey ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'environment' : 'env_file') : 'not_configured',
           pythonCommand: pythonCmd,
           message: pythonAvailable 
             ? 'AI service is ready' 
@@ -128,12 +128,13 @@ async function checkAIService() {
       testProcess.on('error', () => {
         const envVars = readEnvFile();
         const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || envVars.GEMINI_API_KEY || envVars.GOOGLE_API_KEY;
+        const hasApiKey = !!apiKey;
         resolve({
           status: 'unhealthy',
           available: false,
           serviceFile: pythonExists,
-          apiKeyConfigured: true,
-          apiKeySource: apiKey ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'environment' : 'env_file') : 'hardcoded_fallback',
+          apiKeyConfigured: hasApiKey,
+          apiKeySource: hasApiKey ? (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'environment' : 'env_file') : 'not_configured',
           message: 'Python not available',
           error: 'Python command not found'
         });

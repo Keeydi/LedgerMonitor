@@ -56,6 +56,18 @@ This documentation package includes the following documents:
      - Testing procedures
      - Troubleshooting guide
 
+### 6. **System Schematic Diagram** (`07-System-Schematic-Diagram.md`)
+   - **What it is:** Comprehensive technical diagram of system architecture
+   - **Who should read it:** Developers, system architects, technical personnel
+   - **Contents:**
+     - Complete system architecture
+     - ANPR processing flow
+     - Component interaction diagrams
+     - Technology stack details
+     - Data flow architecture
+     - System interfaces
+     - ANPR-specific components
+
 ## 🎯 How to Use This Documentation
 
 ### For Non-Technical Users
@@ -78,6 +90,12 @@ If you're not familiar with IT systems:
    - Network Architecture (understand connections)
    - System Flowchart (understand processes)
    - Installation Guide (follow setup steps)
+   - System Schematic Diagram (technical architecture details)
+
+### For Developers/System Architects
+
+1. **Read:** System Schematic Diagram (comprehensive technical overview)
+2. **Reference:** Network Architecture and System Flowchart (for implementation details)
 
 ### For System Operators
 
@@ -111,6 +129,9 @@ All documents are designed to be:
 
 **Q: What does the system do?**
 - A: See System Overview document
+
+**Q: What is the technical architecture?**
+- A: See System Schematic Diagram document
 
 ## 📞 Getting Help
 
